@@ -34,7 +34,11 @@ public class ArtifactPowers : MonoBehaviour
         registry["transform.balance"] = new JusticeBalanceEffect();
         registry["transform.plus1"] = new ApothecaryFortifierEffect();
         registry["transform.flashscroll"] = new FlashScrollEffect();
-        registry["transform.mirror"] = new MirrorEffect();
+
+        var mirror = new MirrorEffect();
+        registry["transform.mirror"] = mirror;
+        registry["add.mirror"] = mirror;   // clé utilisée par l'asset Mirror
+        registry["mirror"] = mirror;       // id de l'asset (fallback)
 
         // AJOUT
         registry["add.surprise"] = new SurpriseDieEffect();
@@ -116,6 +120,17 @@ public class ArtifactPowers : MonoBehaviour
 
         if (!effect.IsUsableNow(gm, out var reason))
         { gm?.hintBanner?.Show(reason ?? "Artefact inutilisable maintenant."); return; }
+
+        // TRAIT Boss "Audit des Morts" : 1×/match, l'artefact joué est annulé et confisqué
+        if (gm != null && gm.Boss_TryAuditCancelArtifact())
+        {
+            int safeIdx = Mathf.Clamp(index, 0, inventory.Count - 1);
+            inventory.RemoveAt(safeIdx);
+            inventoryUI?.RefreshNow();
+            gm?.inventoryDots?.Refresh();
+            inventoryUI?.Hide();
+            return;
+        }
 
         // Déclenche l’effet, consomme à la fin
         effect.BeginUse(gm, onConsumed: () =>

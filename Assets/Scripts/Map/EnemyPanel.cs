@@ -9,6 +9,7 @@ public class EnemyPanel : MonoBehaviour
     public Image portrait;
     public TMP_Text nameText;
     public TMP_Text descText;
+    public TMP_Text traitText;   // onglet "Trait" : affiche l'affixe propre de l'ennemi
 
     [Header("Layout")]
     public Vector2 offset = new Vector2(16f, -16f);
@@ -55,6 +56,14 @@ public class EnemyPanel : MonoBehaviour
 
         if (nameText)  nameText.text = info != null ? info.name : "—";
         if (descText)  descText.text = info != null ? (string.IsNullOrEmpty(info.description) ? "…" : info.description) : "";
+
+        if (traitText)
+        {
+            bool hasTrait = info != null && !string.IsNullOrEmpty(info.afflictionName);
+            traitText.gameObject.SetActive(hasTrait);
+            if (hasTrait)
+                traitText.text = $"Trait : {info.afflictionName}\n{info.afflictionDescription}";
+        }
 
         root.gameObject.SetActive(true);
         root.SetAsLastSibling();

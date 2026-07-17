@@ -3,14 +3,6 @@ A FAIRE
 
 - Mise en place des Afflixions
 
-- Poser tous les artefacts et type d'artefact
-Relance {X} Artefacts {X}
-Transformation {X} Artefacts {X}
-Ajout {X} Artefacts {X}
-Score {X} Artefacts {X}
-
-SUPPRIME - Type Contre jeu
-
 - Fait que les adversaires peuvent posséder et utiliser des artefacts
 
 - Mettre le fait de gagner un artefact entre chaque victoire ET défaite
@@ -29,7 +21,7 @@ SUPPRIME - Type Contre jeu
 
 IDEES
 ----------------------------------------------
-A la fin d'un palier, le joueur à le choix d'assimilés une des 3 afflictions des adversaires rencontrés.
+A la fin d'un palier, le joueur à le choix d'assimilés une des afflictions des adversaires battus.
 
 
 
@@ -38,19 +30,7 @@ A AJOUTER
 
 - Indicateur d'un double flash lors d'un Flash
 
-- Indicateur du score d'entrée
-
-- Indicateur de score de Palier à atteindre 
-
 - Faire animation roll des dés
-
-- Dans ArtifactCard, ajouter le type de l'artefact
-
-- Début d'une manche, Tir d'un dé pour savoir qui jouera en premier (Montant le plus élévé qui commence - si les joueurs ont le meme dé, les 2 joueurs doivent relancer)
-
-- Faire une séléction de dés étape par étape pour l'IA 
-
-- Texte si le joueur appuie sur un artefact pendant le tour de l'IA (Impossible d'utiliser l'artefact, ce n'est pas votre tour)
 
 ----------------------------------------------
 
@@ -61,8 +41,6 @@ QUESTIONS
 - Système de déplacement des dés et mise de coté des dés à garder ?
 
 - Dés plus petit (original = 160 > 80) ?
-
-- Affichage du score avec objectif ? (0/300)
 
 - Enlever système inventaire en defillement et avoir les 3 objets tous visibles ?
 

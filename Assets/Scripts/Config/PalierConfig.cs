@@ -21,6 +21,7 @@ public class PalierConfig : ScriptableObject
         public string afflictionName;           // affliction name
         public string afflictionDescription;    // affliction text
         public string afflictionKey;            // affliction clé
+        public Sprite afflictionIcon;           // illustration du trait (AddBox / cartes de choix)
     }
 
 

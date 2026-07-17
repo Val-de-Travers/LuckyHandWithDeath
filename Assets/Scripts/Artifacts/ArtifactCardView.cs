@@ -107,6 +107,25 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (descLabel && descLabel.gameObject.activeSelf) descLabel.text = a.description;
     }
 
+    // Affiche un contenu "libre" (ex: un Trait) sur la carte, sans Artifact sous-jacent.
+    string rawTooltip;
+    public void BindRaw(string title, string desc, Sprite iconSprite = null, string typeText = "Trait")
+    {
+        artifact = null;
+        rawTooltip = desc;
+
+        if (icon)
+        {
+            icon.sprite = iconSprite;
+            icon.enabled = iconSprite != null;
+            icon.preserveAspect = true;
+            icon.color = Color.white;
+        }
+        if (nameLabel) nameLabel.text = title;
+        if (typeLabel) typeLabel.text = typeText;
+        if (descLabel && descLabel.gameObject.activeSelf) descLabel.text = desc;
+    }
+
     static string TypeToLabel(ArtifactType t) => t switch
     {
         ArtifactType.Relance => "Relance",
@@ -121,9 +140,10 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public void OnPointerEnter(PointerEventData eventData)
     {
         isHover = true;
-        if (tooltip != null && artifact != null)
+        string tip = artifact != null ? artifact.description : rawTooltip;
+        if (tooltip != null && !string.IsNullOrEmpty(tip))
         {
-            tooltip.Show(artifact.description, eventData.position);
+            tooltip.Show(tip, eventData.position);
             tooltip.FollowMouse(eventData.position);
         }
     }

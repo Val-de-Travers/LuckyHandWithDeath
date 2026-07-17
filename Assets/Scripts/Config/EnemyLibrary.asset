@@ -20,40 +20,44 @@ MonoBehaviour:
     afflictionName: "N\u0153ud Coulant"
     afflictionDescription: "\xC0 chaque relance de 1 d\xE9, 10% qu\u2019un d\xE9
       tombe \xE0 2."
-    afflictionKey: 
+    afflictionKey: 'noose '
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: La Magicienne
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
-    description: "Il a mal lanc\xE9 un sort."
+    description: "Elle a lanc\xE9 un sort interdit. Sa confr\xE9rie la donc faite
+      ex\xE9cuter."
     afflictionName: Runes magiques
-    afflictionDescription: "Elle a lanc\xE9 un sort interdit. Sa confr\xE9rie la
-      donc faite ex\xE9cuter."
-    afflictionKey: 
+    afflictionDescription: "20% de chances tous les 3 tours de faire un flash al\xE9atoires."
+    afflictionKey: runes
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: L'Alchimiste
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
     description: "Il a mal r\xE9alis\xE9 une potion et le client s'est retourn\xE9
       contre lui en le poignardant."
     afflictionName: "Potion sp\xE9ciale"
-    afflictionDescription: "Il a mal r\xE9alis\xE9 une potion pour un client et ce
-      dernier c\u2019est veng\xE9 en le poignardant \xE0 la sortie de son \xE9choppe."
+    afflictionDescription: 
     afflictionKey: 
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: Le Tavernier
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
     description: "Il a \xE9t\xE9 \xE9cras\xE9 par ses tonneaux de bi\xE8re lors d\u2019un
       changement de service."
     afflictionName: "Happy Hour termin\xE9"
-    afflictionDescription: "Il a \xE9t\xE9 \xE9cras\xE9 par ses tonneaux de bi\xE8re
-      lors d\u2019un changement de fut de bi\xE8re lors du service."
-    afflictionKey: 
+    afflictionDescription: "Si le joueur adverse d\xE9passes 75 sur un tour, il dois
+      banker."
+    afflictionKey: happyhour
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: Le Chasseur
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
     description: "Il a tr\xE9buch\xE9 sur son pi\xE8ge \xE0 ours la t\xEAte la premi\xE8re."
     afflictionName: 'Pistage '
     afflictionDescription: "Son premier jet de la partie aura 2 d\xE9s de 10 "
-    afflictionKey: 
+    afflictionKey: tracking
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: "La Chevali\xE8re"
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3657348073803524614, guid: ca371a66dac716642a11efc6e351c591, type: 3}
@@ -62,7 +66,8 @@ MonoBehaviour:
     afflictionName: "Coup d\u2019estoc"
     afflictionDescription: "En cas de d\xE9faite lors d\u2019une Confirmation pour
       un Brelan, elle peut relancer exceptionnellement le d\xE9 perdant."
-    afflictionKey: 
+    afflictionKey: 'estoc '
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: "Le Ma\xEEtre Pigeonnier"
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
@@ -71,6 +76,7 @@ MonoBehaviour:
     afflictionName: "Lanc\xE9 de graines"
     afflictionDescription: 
     afflictionKey: 
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: L'Assassin
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
@@ -79,7 +85,8 @@ MonoBehaviour:
     afflictionName: "Verre empoisonn\xE9 "
     afflictionDescription: "1 fois dans la partie si l\u2019adversaire d\xE9passe
       100 points, son score final est divis\xE9 par 2."
-    afflictionKey: 
+    afflictionKey: 'poisonglass '
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: L'Amoureux
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3657348073803524614, guid: ca371a66dac716642a11efc6e351c591, type: 3}
@@ -87,7 +94,8 @@ MonoBehaviour:
       trompait."
     afflictionName: Lettre de rupture
     afflictionDescription: 
-    afflictionKey: 
+    afflictionKey: ' '
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: Le Noble
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
@@ -95,11 +103,23 @@ MonoBehaviour:
       malgr\xE9 le fait qu'il n'ait plus de t\xEAte."
     afflictionName: "Bien n\xE9"
     afflictionDescription: "Il gagne 35 points d\u2019office sur ses 3 premiers jets."
-    afflictionKey: 
+    afflictionKey: wellborn
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: Le Sorcier
     icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
     portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
     description: 
-    afflictionName: 
+    afflictionName: "Mal\xE9diction maudite"
     afflictionDescription: 
     afflictionKey: 
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
+  - name: "Le Tr\xE9sorier"
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
+    description: "Il a \xE9t\xE9 tabass\xE9 \xE0 mort par des villageois lors de
+      l\u2019imp\xF4t f\xE9odale mensuel."
+    afflictionName: "Imp\xF4ts en douceur"
+    afflictionDescription: "Il pr\xE9l\xE8ve 10 points sur tous les tours gagnant
+      de l\u2019adversaire."
+    afflictionKey: 
+    afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
