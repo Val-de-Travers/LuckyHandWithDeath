@@ -268,8 +268,13 @@ public class GameManager : MonoBehaviour
     private bool awaitingCounterPlay = false;
     // PiercedPurse : -25% sur la bank de l'IA pour CE tour (0.75).
     private float aiBankMultiplier = 1f;
-    // SleepingHorn : annule la prochaine Clause de l'IA (flash sans continuation).
-    private bool aiCancelNextClause = false;
+    // Dés du Flash IA en cours (valide uniquement pendant la fenêtre qui suit un Flash).
+    private readonly List<int> aiFlashIndices = new List<int>();
+    // Un contre-jeu a touché un dé du Flash → le Flash est invalidé (pas de Clause).
+    private bool aiFlashCancelled = false;
+    // Un contre-jeu a modifié les dés → à la fermeture de la fenêtre, l'IA re-sélectionne
+    // les dés marquants libres (elle ne les relance pas).
+    private bool aiDiceChangedByCounter = false;
 
     // Campagne
     private System.Random campaignRng;
@@ -628,6 +633,14 @@ public class GameManager : MonoBehaviour
             palierIndex++;
             enemyIndex = 0;
 
+            // Passage de palier : le joueur se dégage d'une défaite (s'il en a).
+            if (defeatsCount > 0)
+            {
+                defeatsCount--;
+                hintBanner?.Show($"Nouveau palier : une défaite vous est retirée ({defeatsCount}/3).");
+                uiLog?.Append($"Passage de palier — une défaite effacée ({defeatsCount}/3).");
+            }
+
             if (palierIndex >= GetPalierCount())
             {
                 hintBanner?.Show("Campagne terminée ! (Tous les Paliers joués)");
@@ -698,7 +711,9 @@ public class GameManager : MonoBehaviour
         // Reset des états de Contre-Jeu à chaque changement de tour
         awaitingCounterPlay = false;
         aiBankMultiplier = 1f;
-        aiCancelNextClause = false;
+        aiFlashIndices.Clear();
+        aiFlashCancelled = false;
+        aiDiceChangedByCounter = false;
 
         turnScore = 0;
         flashPendingResolution = false;
@@ -788,12 +803,22 @@ public class GameManager : MonoBehaviour
     {
         WIN_THRESHOLD = GetWinThresholdForPalier(palierIndex);
 
-        // Scores visibles
-        string playerOpenTag = playerOpened ? "" : $" (ouvrir ≥{ENTRY_THRESHOLD})";
-        string aiOpenTag = aiOpened ? "" : $" (ouvrir ≥{ENTRY_THRESHOLD})";
+        // Scores visibles : uniquement "score / objectif pts" (pas de nom).
+        // Avant l'ouverture → objectif = seuil d'entrée (35).
+        // Après l'ouverture → objectif = score du palier, ou le score à battre si une
+        // phase finale a été déclenchée (mis à jour pour les DEUX joueurs).
+        int goal = finalPhase ? targetScore : WIN_THRESHOLD;
 
-        if (playerScoreText) playerScoreText.text = $"Joueur : {playerScore}{playerOpenTag}";
-        if (aiScoreText) aiScoreText.text = $"IA : {aiScore}{aiOpenTag}";
+        if (playerScoreText)
+            playerScoreText.text = playerOpened
+                ? $"{playerScore} / {goal} pts"
+                : $"{playerScore} / {ENTRY_THRESHOLD} pts";
+
+        if (aiScoreText)
+            aiScoreText.text = aiOpened
+                ? $"{aiScore} / {goal} pts"
+                : $"{aiScore} / {ENTRY_THRESHOLD} pts";
+
         if (turnScoreText) turnScoreText.text = $"Score du tour : {turnScore}";
 
         // Si on est en mode sélection d’artefact, message dédié dans le bandeau
@@ -1467,6 +1492,55 @@ public class GameManager : MonoBehaviour
 
         awaitingCounterPlay = false;
         if (endRoundButton) endRoundButton.interactable = false;
+
+        // Un contre-jeu a bougé des dés : l'IA RE-SÉLECTIONNE les dés marquants libres
+        // (elle ne les relance pas — le résultat du contre-jeu est définitif).
+        if (aiDiceChangedByCounter)
+        {
+            aiDiceChangedByCounter = false;
+            yield return StartCoroutine(AIReselectScoringDice());
+        }
+    }
+
+    // Après un contre-jeu, l'IA re-sélectionne (verrouille) les dés marquants restés libres,
+    // un par un, sans les relancer. Aucun Flash n'est accordé ici : un contre-jeu ne doit
+    // jamais offrir un Flash à l'IA.
+    IEnumerator AIReselectScoringDice()
+    {
+        if (dice == null) yield break;
+
+        var unlocked = Enumerable.Range(0, dice.Count)
+            .Where(i => dice[i] != null && !dice[i].isLocked).ToList();
+        if (unlocked.Count == 0) yield break;
+
+        var counts = new Dictionary<DieFace, int>();
+        foreach (var i in unlocked)
+        {
+            var f = dice[i].GetFace();
+            if (f == DieFace.Sun) continue;
+            if (!counts.ContainsKey(f)) counts[f] = 0;
+            counts[f]++;
+        }
+        bool pairExists = counts.Values.Any(v => v >= 2);
+
+        var toLock = new List<int>();
+        foreach (var i in unlocked)
+        {
+            var f = dice[i].GetFace();
+            if (f == DieFace.Five || f == DieFace.Ten) toLock.Add(i);
+            else if (f == DieFace.Sun && !pairExists) toLock.Add(i);
+        }
+        if (toLock.Count == 0) yield break;
+
+        yield return StartCoroutine(AILockDiceOneByOne(
+            toLock,
+            pointsFor: i =>
+            {
+                var f = dice[i].GetFace();
+                if (f == DieFace.Five) return 5;
+                if (f == DieFace.Ten || f == DieFace.Sun) return 10;
+                return 0;
+            }));
     }
 
     // ---- Effets de Contre-Jeu (appelés par les artefacts pendant la fenêtre) ----
@@ -1479,12 +1553,36 @@ public class GameManager : MonoBehaviour
         uiLog?.Append("Contre-Jeu : Bourse percée (bank IA -25%).");
     }
 
-    // Corne de sommeil : annule le prochain Flash de l'IA (retire ses points, pas de Clause).
+    // Un Flash de l'IA est-il actif (fenêtre juste après le Flash) ? — requis par la Corne de sommeil.
+    public bool AIHasActiveFlash() => aiFlashIndices.Count >= 3 && IsCounterPlayWindowOpen();
+
+    // Corne de sommeil : annule le Flash de l'IA et RELANCE immédiatement les trois dés concernés.
+    // L'effet est appliqué tout de suite (pas besoin d'attendre Next) ; le joueur appuie ensuite
+    // sur Next pour laisser l'IA reprendre (elle re-sélectionnera les dés marquants).
     public void CounterPlay_SleepingHorn()
     {
-        aiCancelNextClause = true; // (drapeau réutilisé : annule le Flash à la prochaine fenêtre)
-        hintBanner?.Show("Corne de sommeil : le prochain Flash de l'IA sera annulé.");
-        uiLog?.Append("Contre-Jeu : Corne de sommeil (prochain Flash IA annulé).");
+        if (aiFlashIndices.Count < 3)
+        {
+            hintBanner?.Show("Corne de sommeil : aucun Flash de l'IA à annuler.");
+            return;
+        }
+
+        foreach (var i in aiFlashIndices)
+        {
+            if (i < 0 || i >= dice.Count || dice[i] == null) continue;
+            dice[i].SetLocked(false);   // le Flash est annulé : les dés sont désélectionnés
+            dice[i].Roll();             // ... et relancés immédiatement
+            dice[i].Pulse(0.22f, 1.12f);
+        }
+        aiFlashIndices.Clear();
+        aiFlashCancelled = true;        // le Flash ne sera pas rejoué (pas de Clause)
+
+        ClearClauseState();
+        RecomputeAIScoreFromLockedDice(); // retire les points du Flash annulé
+        aiDiceChangedByCounter = true;    // l'IA re-sélectionnera après Next
+
+        hintBanner?.Show("Corne de sommeil : Flash annulé — les trois dés sont relancés. Appuyez sur Next.");
+        uiLog?.Append("Contre-Jeu : Corne de sommeil (Flash IA annulé + 3 dés relancés).");
     }
 
     // Valeur "haute" d'une face pour comparer les dés (Sun compté comme 10).
@@ -1544,15 +1642,33 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
-    // Relance UNE FOIS un dé posé de l'IA et le GARDE verrouillé à sa nouvelle valeur
-    // (l'IA ne pourra pas le relancer une seconde fois), puis réévalue le score.
+    // Relance UNE FOIS un dé posé de l'IA et le DÉSÉLECTIONNE (il quitte les dés posés).
+    // Le score est réévalué sans lui ; après Next, l'IA le re-sélectionnera s'il est marquant
+    // (elle ne le relancera pas une seconde fois).
     void CounterReturnLockedDie(int i)
     {
         if (i < 0 || i >= dice.Count || dice[i] == null) return;
-        dice[i].Roll();               // relance unique (le dé reste verrouillé)
-        dice[i].SetLocked(true);      // sécurité : il demeure "sélectionné" par l'IA
+        BreakAIFlashIfDieBelongsToIt(i);
+        dice[i].Roll();               // relance unique
+        dice[i].SetLocked(false);     // désélectionné
         dice[i].Pulse(0.22f, 1.12f);
         RecomputeAIScoreFromLockedDice();
+        aiDiceChangedByCounter = true; // l'IA re-sélectionnera après Next (sans relancer)
+    }
+
+    // Si le dé ciblé appartient au Flash de l'IA, le Flash est brisé :
+    // TOUS les dés du trio sont désélectionnés (ils ne forment plus rien).
+    // L'IA re-sélectionnera ensuite ceux qui sont marquants par eux-mêmes (10, 5...).
+    void BreakAIFlashIfDieBelongsToIt(int i)
+    {
+        if (!aiFlashIndices.Contains(i)) return;
+
+        foreach (var k in aiFlashIndices)
+            if (k >= 0 && k < dice.Count && dice[k] != null)
+                dice[k].SetLocked(false);
+
+        aiFlashCancelled = true;
+        aiDiceChangedByCounter = true;
     }
 
     // Coup de table : relance un dé VERROUILLÉ (déjà scoré) aléatoire de l'IA, puis réévalue.
@@ -1601,14 +1717,21 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // Un dé peut-il encore être affaibli par le Poison ? (un 2 est déjà au minimum)
+    public bool CanPoisonTargetExist()
+        => dice != null && Enumerable.Range(0, dice.Count)
+            .Any(i => dice[i] != null && dice[i].isLocked && dice[i].GetFace() != DieFace.Two);
+
     // Poison douteux : le joueur désigne un dé VERROUILLÉ de l'IA et lui enlève 1 (face précédente),
     // puis on réévalue entièrement le score de l'IA (un Flash cassé perd ses points).
+    // Un dé déjà sur 2 ne peut pas être ciblé (impossible de descendre plus bas).
     public void CounterPlay_QuestionablePoison()
     {
-        bool Filter(int i) => i >= 0 && i < dice.Count && dice[i] != null && dice[i].isLocked;
+        bool Filter(int i) => i >= 0 && i < dice.Count && dice[i] != null
+                             && dice[i].isLocked && dice[i].GetFace() != DieFace.Two;
         if (!Enumerable.Range(0, dice.Count).Any(Filter))
         {
-            hintBanner?.Show("Poison douteux : l'IA n'a aucun dé posé.");
+            hintBanner?.Show("Poison douteux : aucun dé posé de l'IA ne peut être affaibli.");
             return;
         }
         BeginExternalDiePick(Filter, i =>
@@ -1624,8 +1747,10 @@ public class GameManager : MonoBehaviour
                 DieFace.Three => DieFace.Two,
                 _ => DieFace.Two
             };
+            BreakAIFlashIfDieBelongsToIt(i); // Flash brisé → tout le trio est désélectionné
             dice[i].SetFace(lower);
             RecomputeAIScoreFromLockedDice();
+            aiDiceChangedByCounter = true;
             hintBanner?.Show($"Poison douteux : le dé passe à {(int)lower} (score IA réévalué).");
             uiLog?.Append($"Contre-Jeu : Poison douteux (dé {i + 1} → {(int)lower}).");
         }, "Poison douteux : choisis un dé posé de l'IA à affaiblir (-1).");
@@ -1794,14 +1919,19 @@ public class GameManager : MonoBehaviour
                 lumpSumAfter: evalFlashOnly.pointsGained));
 
             // Fenêtre de contre-jeu JUSTE APRÈS le Flash de l'IA.
-            // La Corne de sommeil (aiCancelNextClause) ANNULE le Flash ; un contre-jeu de dé
-            // peut aussi le briser. Le score n'est pas "validé" tant que le joueur n'a pas
-            // joué son contre-jeu ou appuyé sur Next.
+            // Les dés du Flash sont exposés pour la Corne de sommeil (qui l'annule et les relance
+            // immédiatement). Le score n'est pas "validé" tant que le joueur n'a pas joué son
+            // contre-jeu ou appuyé sur Next.
+            aiFlashIndices.Clear();
+            aiFlashIndices.AddRange(evalFlashOnly.flashLockIndices);
+
             yield return StartCoroutine(AICounterPlayWindow());
+            aiFlashIndices.Clear(); // le Flash n'est plus "actif" pour la Corne hors de cette fenêtre
             if (gameOver || matchOver || isGameOverScreen) yield break;
 
-            // Le Flash tient-il toujours ? (un contre-jeu de dé a pu casser le trio)
-            bool flashStillValid = evalFlashOnly.flashLockIndices.Count >= 3
+            // Le Flash tient-il toujours ? (un contre-jeu a pu l'annuler / casser le trio)
+            bool flashStillValid = !aiFlashCancelled
+                && evalFlashOnly.flashLockIndices.Count >= 3
                 && evalFlashOnly.flashLockIndices.All(i => dice[i] != null && dice[i].isLocked);
             if (flashStillValid)
             {
@@ -1809,27 +1939,11 @@ public class GameManager : MonoBehaviour
                 int sunCount = evalFlashOnly.flashLockIndices.Count(i => dice[i].GetFace() == DieFace.Sun);
                 flashStillValid = (sameCount >= 3) || (sameCount >= 2 && sunCount >= 1);
             }
+            aiFlashCancelled = false; // consommé
 
-            // Corne de sommeil : ANNULE le Flash → déverrouille le trio + retire les points.
-            if (aiCancelNextClause)
-            {
-                aiCancelNextClause = false;
-
-                foreach (var i in evalFlashOnly.flashLockIndices)
-                    if (i >= 0 && i < dice.Count && dice[i] != null)
-                        dice[i].SetLocked(false);
-
-                ClearClauseState();
-                RecomputeAIScoreFromLockedDice(); // retire les points du Flash annulé
-                hintBanner?.Show("Corne de sommeil : le Flash de l'IA est annulé.");
-                uiLog?.Append("Contre-Jeu : Flash IA annulé (Corne de sommeil).");
-                SetPhase(Phase.AITurnPlaying);
-                yield break;
-            }
-
-            // Flash brisé par un contre-jeu de dé (Coup de table / Clocher / Poison) :
-            // le dé modifié reste VERROUILLÉ à sa nouvelle valeur (l'IA ne le relance pas),
-            // le score a déjà été réévalué par l'effet. On saute simplement la Clause.
+            // Flash brisé/annulé par un contre-jeu (Corne de sommeil, Coup de table, Clocher, Poison) :
+            // les effets ont déjà réévalué le score et re-sélectionné ce qu'il fallait.
+            // On saute simplement la Clause.
             if (!flashStillValid)
             {
                 ClearClauseState();
@@ -2885,10 +2999,18 @@ public class GameManager : MonoBehaviour
 
     public System.Collections.IEnumerator Artifact_RerollTurn()
     {
-        // "Temps niv.1" : on rejoue le COUP ENTIER — tous les dés sont relancés,
-        // y compris ceux sélectionnés/mis de côté ce tour. Le score du tour repart de zéro
-        // et sera recalculé à partir du nouveau jet.
+        // "Temps niv.1" : on refait un LANCÉ ENTIER (les 5 dés, même ceux mis de côté),
+        // PAS un tour complet : le score total du tour est CONSERVÉ.
+        // Si une Clause vient d'être perdue (wimpout), le score perdu est restauré :
+        // l'artefact "rembobine" ce lancé raté.
         if (dice == null || dice.Count == 0) yield break;
+
+        if (wimpoutLostTurnScore > 0 && turnScore == 0)
+        {
+            turnScore = wimpoutLostTurnScore;
+            uiLog?.Append($"Artefact du temps : score du tour restauré ({turnScore}).");
+        }
+        wimpoutLostTurnScore = 0;
 
         foreach (var d in dice) if (d != null) d.SetLocked(false);
         frozenLocks.Clear();
@@ -2899,7 +3021,7 @@ public class GameManager : MonoBehaviour
         eligibleLockPoints.Clear();
         clauseClearedBySelection = false;
         flashPendingResolution = false;
-        turnScore = 0;
+        // ⚠️ turnScore n'est PAS remis à zéro : seul le lancé est rejoué.
         UpdateUI();
 
         var rollableIndices = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null).ToList();
@@ -2952,7 +3074,8 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            // Wimpout
+            // Wimpout : le score conservé est perdu (risque du relancé), récupérable via Os du Tricheur
+            wimpoutLostTurnScore = turnScore;
             turnScore = 0;
             UpdateUI();
             ShowAction("Wimpout.");
