@@ -194,10 +194,14 @@ public class GameManager : MonoBehaviour
     public Button devShowArtifactListButton;   // bouton qui ouvre/ferme la liste complète
     public RectTransform devArtifactListRoot;  // conteneur des cartes (panel, désactivé par défaut)
 
+    [Header("Dev Tools - Force Dice")]
+    public TMP_InputField devForceFacesInput;  // ex: "5 5 10 2 6" (S ou 100 = Sun), dans l'ordre des dés
+    public Button devForceFacesButton;         // applique les valeurs au PROCHAIN jet
+
     private enum Turn { Player, AI }
     private Turn currentTurn = Turn.Player;
 
-    private enum Phase { AwaitFirstRoll, Normal, Clause, WaitEnd, AITurnPlaying, AITurnWaitEnd, AITurnPreBankCounter }
+    private enum Phase { AwaitFirstRoll, Normal, Clause, WaitEnd, AITurnPlaying, AITurnWaitEnd, AITurnPreBankCounter, OpeningRollOff }
 
     private Phase phase = Phase.AwaitFirstRoll;
 
@@ -275,6 +279,15 @@ public class GameManager : MonoBehaviour
     // Un contre-jeu a modifié les dés → à la fermeture de la fenêtre, l'IA re-sélectionne
     // les dés marquants libres (elle ne les relance pas).
     private bool aiDiceChangedByCounter = false;
+
+    [Header("Contre-Jeu / Timer")]
+    [Tooltip("Durée (s) de la fenêtre de contre-jeu avant auto-Next.")]
+    public float counterPlayTimeout = 3f;
+    [Tooltip("Barre de temps (Image en mode Filled) qui se vide pendant la fenêtre de contre-jeu.")]
+    public Image counterPlayTimerBar;
+
+    // ===== Tirage au sort du premier joueur =====
+    private bool openingRollOffBusy = false; // anti double-clic pendant l'animation du tirage
 
     // Campagne
     private System.Random campaignRng;
@@ -489,6 +502,18 @@ public class GameManager : MonoBehaviour
             if (devListPanel) devListPanel.SetActive(false);
         }
 
+        // ---- Dev Force Dice ----
+        if (devForceFacesInput)
+            devForceFacesInput.gameObject.SetActive(showDevTools);
+        if (devForceFacesButton)
+        {
+            devForceFacesButton.gameObject.SetActive(showDevTools);
+            devForceFacesButton.onClick.AddListener(OnPressDevForceFaces);
+        }
+
+        // Barre de temps du contre-jeu masquée par défaut
+        if (counterPlayTimerBar) counterPlayTimerBar.gameObject.SetActive(false);
+
 
 
         StartNewMatch();
@@ -541,11 +566,14 @@ public class GameManager : MonoBehaviour
         clauseClearedBySelection = false;
         wimpoutLostTurnScore = 0;
 
+        // Tirage au sort : chaque joueur lance un dé, le plus fort commence (égalité → relance)
         currentTurn = Turn.Player;
-        SetPhase(Phase.AwaitFirstRoll);
+        openingRollOffBusy = false;
+        SetPhase(Phase.OpeningRollOff);
         UpdateUI();
         RefreshCampaignUI();
         uiLog?.Append($"Match vs Adversaire {enemyIndex + 1}/{GetEnemyCountInPalier(palierIndex)} — Palier {palierIndex + 1}/{GetPalierCount()}");
+        uiLog?.Append("Tirage au sort du premier joueur — ROLL.");
 
         currentEnemyInfo = PickEnemy(palierIndex, enemyIndex);
         if (mapView) mapView.ShowEnemy(currentEnemyInfo);
@@ -841,6 +869,7 @@ public class GameManager : MonoBehaviour
         {
             baseText = phase switch
             {
+                Phase.OpeningRollOff => "Tirage au sort : chaque joueur lance un dé — ROLL !",
                 Phase.AwaitFirstRoll => playerOpened ? "A vous de jouer ! Appuyer sur Roll." : $"Au tour du Joueur — Lance ! (ouvrir ≥ {ENTRY_THRESHOLD})",
                 Phase.Normal => flashPendingResolution ? $"Au tour du Joueur — Flash à dégager (face {(int)currentFlashFace})" : "Au tour du Joueur — Sélectionne puis ROLL",
                 Phase.Clause => $"Au tour du Joueur — Clause (face {(int)currentFlashFace}) — Sélection facultative",
@@ -945,6 +974,9 @@ public class GameManager : MonoBehaviour
         {
             switch (phase)
             {
+                case Phase.OpeningRollOff:
+                    if (rollButton) rollButton.interactable = !openingRollOffBusy; break;
+
                 case Phase.AwaitFirstRoll:
                     if (rollButton) rollButton.interactable = true; break;
 
@@ -1129,6 +1161,13 @@ public class GameManager : MonoBehaviour
 
         if (currentTurn == Turn.Player)
         {
+            // Tirage au sort du premier joueur
+            if (phase == Phase.OpeningRollOff)
+            {
+                if (!openingRollOffBusy) StartCoroutine(ResolveOpeningRollOff());
+                return;
+            }
+
             if (phase == Phase.Normal)
             {
                 // Un dé marquant DOIT être sélectionné pour relancer, sauf hot-dice
@@ -1145,6 +1184,52 @@ public class GameManager : MonoBehaviour
             if (phase == Phase.Clause)
             { StartCoroutine(ResolvePlayerClauseStep()); return; }
         }
+    }
+
+    // Tirage au sort : dice[0] = dé du Joueur, dice[1] = dé de l'IA.
+    // Le plus fort commence son tour ; égalité → on relance.
+    IEnumerator ResolveOpeningRollOff()
+    {
+        if (dice == null || dice.Count < 2 || dice[0] == null || dice[1] == null)
+        {
+            // Pas assez de dés pour un tirage : le joueur commence par défaut.
+            StartNewTurn(Turn.Player);
+            yield break;
+        }
+
+        openingRollOffBusy = true;
+        ApplyButtonsState();
+
+        var playerDie = dice[0];
+        var aiDie = dice[1];
+
+        playerDie.Roll();
+        yield return new WaitForSeconds(0.45f);
+        aiDie.Roll();
+        yield return new WaitForSeconds(0.6f);
+
+        int pv = HighValueOf(playerDie.GetFace());
+        int av = HighValueOf(aiDie.GetFace());
+
+        if (pv == av)
+        {
+            ShowAction($"Égalité ({pv}) ! Relancez les dés — ROLL.");
+            uiLog?.Append($"Tirage au sort : égalité ({pv}). Relance.");
+            openingRollOffBusy = false;
+            ApplyButtonsState();
+            yield break;
+        }
+
+        bool playerStarts = pv > av;
+        ShowAction(playerStarts
+            ? $"Vous remportez le tirage ({pv} contre {av}) — à vous de commencer !"
+            : $"L'IA remporte le tirage ({av} contre {pv}) — elle commence.");
+        uiLog?.Append($"Tirage au sort : Joueur {pv} / IA {av} → {(playerStarts ? "Joueur" : "IA")} commence.");
+
+        yield return new WaitForSeconds(1.2f);
+
+        openingRollOffBusy = false;
+        StartNewTurn(playerStarts ? Turn.Player : Turn.AI);
     }
 
     void OnPressBank()
@@ -1313,6 +1398,8 @@ public class GameManager : MonoBehaviour
         lastRolledIndices.AddRange(indicesToRoll);
         yield return null;
 
+        ApplyPendingFaceOverrides(lastRolledIndices); // faces forcées (dev / artefacts)
+
         if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
         {
             ShowAction($"SUPERNOVA ! 5×10 — {PLAYER_NAME} gagne.");
@@ -1398,6 +1485,8 @@ public class GameManager : MonoBehaviour
         lastRolledIndices.Clear();
         lastRolledIndices.AddRange(indicesToRoll);
         yield return null;
+
+        ApplyPendingFaceOverrides(lastRolledIndices); // faces forcées (dev / artefacts)
 
         if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
         { ShowAction($"SUPERNOVA ! 5×10 — {PLAYER_NAME} gagne."); EndMatch(PLAYER_NAME); yield break; }
@@ -1486,10 +1575,45 @@ public class GameManager : MonoBehaviour
         ShowAction("Contre-Jeu : ouvrez l'inventaire et USE pour jouer votre artefact, ou appuyez sur Next pour laisser l'IA jouer.");
         if (endRoundButton) endRoundButton.interactable = true;
 
-        // Attente de la décision du joueur : Next (ferme la fenêtre) ou usage d'artefact(s).
-        while (awaitingCounterPlay && !gameOver && !matchOver && !isGameOverScreen)
-            yield return null;
+        // Timer : barre qui se vide en counterPlayTimeout secondes → auto-Next à zéro.
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.1f, counterPlayTimeout);
+        if (counterPlayTimerBar)
+        {
+            counterPlayTimerBar.gameObject.SetActive(true);
+            counterPlayTimerBar.fillAmount = 1f;
+        }
 
+        // Attente de la décision du joueur : Next, usage d'artefact(s), ou expiration du timer.
+        while (awaitingCounterPlay && !gameOver && !matchOver && !isGameOverScreen)
+        {
+            // Le timer est suspendu pendant que le joueur délibère : inventaire ouvert
+            // ou ciblage de dé en cours (artefact armé).
+            bool timerPaused = (inventoryUI != null && inventoryUI.IsOpen)
+                            || onExternalDiePicked != null
+                            || extPickActive;
+
+            if (!timerPaused)
+            {
+                elapsed += Time.deltaTime;
+                if (counterPlayTimerBar)
+                    counterPlayTimerBar.fillAmount = Mathf.Clamp01(1f - elapsed / duration);
+
+                if (elapsed >= duration)
+                {
+                    // Auto-Next : la fenêtre expire, l'IA reprend
+                    CancelExternalDiePick();
+                    ClearExternalDiePick();
+                    awaitingCounterPlay = false;
+                    uiLog?.Append("Contre-Jeu : temps écoulé — l'IA reprend.");
+                    break;
+                }
+            }
+
+            yield return null;
+        }
+
+        if (counterPlayTimerBar) counterPlayTimerBar.gameObject.SetActive(false);
         awaitingCounterPlay = false;
         if (endRoundButton) endRoundButton.interactable = false;
 
@@ -3919,6 +4043,50 @@ public class GameManager : MonoBehaviour
                 }
             });
         }
+    }
+
+    // ===================== DEV : FORCER LES DÉS DU PROCHAIN JET =====================
+    // Syntaxe du champ : valeurs séparées par espaces/virgules, dans l'ordre des dés.
+    // Valeurs acceptées : 2, 3, 4, 5, 6, 10, et S / SUN / 100 pour le Soleil.
+    // Exemple : "6 6 5 10 S" force les 5 dés ; "5 5" ne force que les deux premiers.
+    private void OnPressDevForceFaces()
+    {
+        if (!devForceFacesInput || string.IsNullOrWhiteSpace(devForceFacesInput.text))
+        { ShowAction("[DEV] Entre des valeurs (ex: 6 6 5 10 S)."); return; }
+        if (dice == null || dice.Count == 0) return;
+
+        var tokens = devForceFacesInput.text
+            .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+        var faces = new List<DieFace>();
+        foreach (var raw in tokens)
+        {
+            var t = raw.Trim().ToLowerInvariant();
+            DieFace? face = t switch
+            {
+                "2" => DieFace.Two,
+                "3" => DieFace.Three,
+                "4" => DieFace.Four,
+                "5" => DieFace.Five,
+                "6" => DieFace.Six,
+                "10" => DieFace.Ten,
+                "s" or "sun" or "100" => DieFace.Sun,
+                _ => null
+            };
+            if (face == null)
+            { ShowAction($"[DEV] Valeur invalide : '{raw}' (attendu 2/3/4/5/6/10/S)."); return; }
+            faces.Add(face.Value);
+        }
+
+        int applied = Mathf.Min(faces.Count, dice.Count);
+        for (int i = 0; i < applied; i++)
+        {
+            if (dice[i] != null)
+                pendingForcedFaces[dice[i]] = faces[i];
+        }
+
+        ShowAction($"[DEV] Prochain jet forcé : {devForceFacesInput.text} ({applied} dé{(applied > 1 ? "s" : "")}).");
+        uiLog?.Append($"[DEV] Faces forcées au prochain jet : {devForceFacesInput.text}");
     }
 
     private void OnPressDevAddCustomPoints()

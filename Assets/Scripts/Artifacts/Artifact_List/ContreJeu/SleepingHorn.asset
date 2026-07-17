@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: sleeping_horn
   displayName: Corne de sommeil
-  description: "Annule le Flash de l\u2019adversaire."
+  description: "Annule le Flash de l\u2019adversaire et relance les trois d\xE9s
+    concern\xE9s."
   icon: {fileID: 21300000, guid: e639f7bc4e817fb4c9fdb21560760778, type: 3}
   rarity: 0
   type: 4
