@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a9d54c3a0bc974047a9c259572f1af87, type: 3}
-  m_Name: TimeArtifactN2
+  m_Name: TimeArtifactN3
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
-  id: time_artifact_niv2
-  displayName: Artefact du Temps Niv2
+  id: time_artifact_niv3
+  displayName: Artefact du Temps Niv3
   description: "Permet de relancer la partie avec son adversaire (Possible uniquement
     avant une d\xE9faite)"
   icon: {fileID: 21300000, guid: cf3583cc57688424a898d627439446b8, type: 3}

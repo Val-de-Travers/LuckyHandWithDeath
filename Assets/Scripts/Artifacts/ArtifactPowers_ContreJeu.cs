@@ -5,13 +5,13 @@ using UnityEngine;
 // ouverte au tour de l'IA (avant/après un lancé).
 public abstract class CounterPlayEffectBase : IArtifactEffect
 {
-    public bool IsUsableNow(GameManager gm, out string reason)
+    public virtual bool IsUsableNow(GameManager gm, out string reason)
     {
         reason = null;
         if (gm == null) { reason = "Contexte manquant."; return false; }
         if (!gm.IsCounterPlayWindowOpen())
         {
-            reason = "Contre-Jeu : jouable uniquement pendant le tour de l'IA (avant/après un lancé).";
+            reason = "Contre-Jeu : jouable uniquement pendant le tour de l'IA (après un lancé).";
             return false;
         }
         return true;
@@ -30,9 +30,21 @@ public class PiercedPurseEffect : CounterPlayEffectBase
     }
 }
 
-// Corne de sommeil : annule la prochaine Clause de l'IA.
+// Corne de sommeil : annule le Flash de l'IA et relance immédiatement les trois dés concernés.
+// Jouable uniquement pendant la fenêtre qui suit un Flash de l'IA.
 public class SleepingHornCounterEffect : CounterPlayEffectBase
 {
+    public override bool IsUsableNow(GameManager gm, out string reason)
+    {
+        if (!base.IsUsableNow(gm, out reason)) return false;
+        if (!gm.AIHasActiveFlash())
+        {
+            reason = "Corne de sommeil : utilisable seulement quand l'IA vient de faire un Flash.";
+            return false;
+        }
+        return true;
+    }
+
     public override void BeginUse(GameManager gm, Action onConsumed)
     {
         gm.CounterPlay_SleepingHorn();
@@ -60,9 +72,21 @@ public class WatchersTowerEffect : CounterPlayEffectBase
     }
 }
 
-// Poison douteux : le joueur désigne un dé de l'IA et lui enlève 1 (face précédente).
+// Poison douteux : le joueur désigne un dé posé de l'IA et lui enlève 1 (face précédente).
+// Un dé déjà sur 2 ne peut pas être ciblé (impossible de descendre plus bas).
 public class QuestionablePoisonCounterEffect : CounterPlayEffectBase
 {
+    public override bool IsUsableNow(GameManager gm, out string reason)
+    {
+        if (!base.IsUsableNow(gm, out reason)) return false;
+        if (!gm.CanPoisonTargetExist())
+        {
+            reason = "Poison douteux : aucun dé posé de l'IA ne peut être affaibli (un 2 est déjà au minimum).";
+            return false;
+        }
+        return true;
+    }
+
     public override void BeginUse(GameManager gm, Action onConsumed)
     {
         gm.CounterPlay_QuestionablePoison();
