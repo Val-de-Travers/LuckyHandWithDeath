@@ -289,6 +289,221 @@ public class GameManager : MonoBehaviour
     // ===== Tirage au sort du premier joueur =====
     private bool openingRollOffBusy = false; // anti double-clic pendant l'animation du tirage
 
+    // ===================== TRAITS / AFFIXES =====================
+    // Traits acquis par le joueur (persistent sur toute la campagne)
+    private readonly List<TraitDef> playerTraits = new();
+    // Traits ennemis actifs pour LE MATCH EN COURS (vide si aucun).
+    // Palier 5 : peut contenir le trait propre du boss ET un trait boss aléatoire.
+    private readonly HashSet<string> activeEnemyTraitKeys = new();
+    // Traits ennemis actifs affichables (nom + description + icône) pour l'AddBox de l'IA
+    private readonly List<TraitDef> activeEnemyTraitInfos = new();
+
+    [Header("Traits / UI (AddBox)")]
+    [Tooltip("Conteneur (AddBoxP1) où sont instanciées les vignettes des traits du joueur.")]
+    public RectTransform playerTraitsIconsRoot;
+    [Tooltip("Conteneur (AddBoxP2) où sont instanciées les vignettes du/des trait(s) de l'adversaire.")]
+    public RectTransform aiTraitsIconsRoot;
+    [Tooltip("Taille des vignettes de trait.")]
+    public Vector2 traitIconSize = new Vector2(48f, 48f);
+
+    [System.Serializable]
+    public class TraitIconEntry { public string key; public Sprite icon; }
+    [Tooltip("Icônes des traits Boss/Joueur (clé → sprite). Les traits ennemis utilisent afflictionIcon.")]
+    public List<TraitIconEntry> traitIcons = new();
+
+    Sprite GetTraitIcon(TraitDef t)
+    {
+        if (t == null) return null;
+        if (t.icon != null) return t.icon;
+        if (traitIcons != null)
+            foreach (var e in traitIcons)
+                if (e != null && NormalizeTraitKey(e.key) == t.key) return e.icon;
+        return null;
+    }
+
+    [Header("Inventaire adversaire (UI)")]
+    [Tooltip("Icône de l'artefact possédé par l'adversaire (grisée quand consommé).")]
+    public Image aiArtifactIcon;
+    [Tooltip("Nom de l'artefact possédé par l'adversaire.")]
+    public TMP_Text aiArtifactLabel;
+    [Tooltip("Inventaire de l'adversaire : un composant PlayerInventory dédié (voir InventoryUI de l'IA).")]
+    public PlayerInventory aiInventory;
+
+    // Met à jour l'inventaire visible de l'adversaire (artefact possédé ce match).
+    void RefreshAIArtifactUI()
+    {
+        bool has = aiArtifact != null;
+
+        // Synchronise l'inventaire IA : l'artefact consommé disparaît de la liste
+        if (aiInventory && aiArtifactUsed && aiInventory.Count > 0)
+            aiInventory.ClearAll();
+
+        if (aiArtifactIcon)
+        {
+            aiArtifactIcon.gameObject.SetActive(has && aiArtifact.icon != null);
+            if (has && aiArtifact.icon != null)
+            {
+                aiArtifactIcon.sprite = aiArtifact.icon;
+                aiArtifactIcon.preserveAspect = true;
+                aiArtifactIcon.color = aiArtifactUsed ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
+            }
+        }
+
+        if (aiArtifactLabel)
+        {
+            if (!has) aiArtifactLabel.text = "";
+            else aiArtifactLabel.text = aiArtifactUsed ? $"<s>{aiArtifact.displayName}</s>" : aiArtifact.displayName;
+        }
+    }
+
+    // Reconstruit les vignettes de traits (icône + tooltip) dans les AddBox des deux joueurs.
+    // À appeler quand la composition change (nouveau match, trait acquis/perdu, replay).
+    void RebuildTraitIcons()
+    {
+        RebuildTraitIconsInto(playerTraitsIconsRoot, playerTraits);
+        RebuildTraitIconsInto(aiTraitsIconsRoot, activeEnemyTraitInfos);
+    }
+
+    void RebuildTraitIconsInto(RectTransform root, List<TraitDef> traits)
+    {
+        if (!root) return;
+
+        for (int i = root.childCount - 1; i >= 0; i--)
+            Destroy(root.GetChild(i).gameObject);
+
+        // Layout horizontal par défaut si le conteneur n'en a pas
+        if (!root.GetComponent<UnityEngine.UI.LayoutGroup>())
+        {
+            var h = root.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.childForceExpandWidth = false;
+            h.childForceExpandHeight = false;
+            h.childAlignment = TextAnchor.MiddleLeft;
+            h.spacing = 4f;
+        }
+
+        var tooltip = EnsureTooltip();
+        foreach (var t in traits)
+        {
+            if (t == null) continue;
+
+            var go = new GameObject("Trait_" + t.key, typeof(RectTransform));
+            go.transform.SetParent(root, false);
+
+            var img = go.AddComponent<Image>();
+            var view = go.AddComponent<TraitIconView>();
+            view.icon = img;
+
+            // Fallback texte si aucune icône
+            TMP_Text label = null;
+            var sprite = GetTraitIcon(t);
+            if (sprite == null)
+            {
+                var labelGO = new GameObject("Label", typeof(RectTransform));
+                labelGO.transform.SetParent(go.transform, false);
+                label = labelGO.AddComponent<TextMeshProUGUI>();
+                label.fontSize = 12f;
+                label.alignment = TextAlignmentOptions.Center;
+                label.textWrappingMode = TextWrappingModes.Normal;
+                var lrt = (RectTransform)labelGO.transform;
+                lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one;
+                lrt.offsetMin = Vector2.zero; lrt.offsetMax = Vector2.zero;
+                img.color = new Color(0f, 0f, 0f, 0.35f); // fond sombre derrière le texte
+            }
+            view.fallbackLabel = label;
+
+            var le = go.AddComponent<LayoutElement>();
+            le.preferredWidth = traitIconSize.x;
+            le.preferredHeight = traitIconSize.y;
+
+            view.Setup(sprite, t.name, t.desc, tooltip);
+        }
+    }
+
+    // ===== Artefact de l'adversaire (chance par palier) =====
+    [Header("Traits / Artefacts ennemis")]
+    [Tooltip("Chance (0..1) qu'un adversaire possède un artefact, par palier (le dernier = boss).")]
+    public float[] enemyArtifactChanceByPalier = { 0f, 0.20f, 0.35f, 0.50f, 1f };
+
+    private Artifact aiArtifact = null;   // artefact possédé par l'IA ce match (null si aucun)
+    private bool aiArtifactUsed = false;
+
+    // Artefacts que l'IA sait jouer (effets implémentés côté IA)
+    static readonly string[] AIUsableArtifactKeys =
+    {
+        "score.entry_ticket",   // Ticket d'entrée : ouverture immédiate
+        "score.marriage_dot",   // Dot de mariage : bank ×2
+        "score.funeral_ledger", // Livre des Comptes : bank +50% si ≥ 70
+        "reroll_one_die",       // Os du Tricheur : relance 1 dé sur wimpout
+        "reroll_turn",          // Temps niv.1 : relance le jet sur wimpout
+        "transform.balance",    // Balance : 2→5 et 6→10
+    };
+
+    static string NormalizeTraitKey(string s)
+        => string.IsNullOrEmpty(s) ? "" : s.Trim().ToLowerInvariant();
+
+    string AIArtifactKey() => aiArtifact ? NormalizeTraitKey(aiArtifact.effectKey) : "";
+    // Ennemis vaincus dans le palier courant (pour le choix de trait de fin de palier)
+    private readonly List<PalierConfig.EnemyInfo> defeatedEnemiesThisPalier = new();
+
+    // État par MATCH des effets de traits
+    private bool traitPoisonGlassUsedVsPlayer = false; // Verre Empoisonné (ennemi → joueur)
+    private bool traitPoisonGlassUsedVsAI = false;     // Verre Empoisonné (joueur → IA)
+    private bool traitBlackSunUsed = false;            // Soleil Noir (boss)
+    private bool traitAuditUsed = false;               // Audit des Morts (boss)
+    private bool traitTideUsed = false;                // Marée du Destin (boss)
+    private int  traitTitheExtra = 0;                  // Tithe of Time : +25 cumulés sur le score cible du joueur
+    private int  traitTitheRollStreak = 0;             // jets consécutifs du joueur sans bank
+    private bool aiHasRolledThisMatch = false;         // Pistage (IA)
+    private bool playerHasRolledThisMatch = false;     // Pistage (joueur)
+    private int  aiTurnsThisMatch = 0;                 // Runes magiques (IA)
+    private int  playerTurnsThisMatch = 0;             // Runes magiques (joueur)
+    private bool estocUsedThisTurnPlayer = false;      // Coup d'estoc (joueur, 1×/tour)
+    // État campagne
+    private bool resurrectionUsed = false;             // Résurrection (1×/campagne)
+
+    // Sélection de trait (cartes cliquables, comme la phase d'artefact)
+    private bool awaitingTraitPick = false;
+    private readonly List<TraitDef> offeredTraits = new();
+    private readonly List<ArtifactCardView> offeredTraitCards = new();
+    private Action afterTraitPick = null;
+
+    bool PlayerHasTrait(string key)
+    {
+        foreach (var t in playerTraits) if (t.key == key) return true;
+        return false;
+    }
+
+    bool EnemyTraitActive(string key)
+        => !gameOver && !isGameOverScreen && activeEnemyTraitKeys.Contains(key);
+
+    // Impôts bourgeois : si les 2 joueurs ont le même score, l'adversaire cède 20% de son score.
+    void CheckBourgeoisTax()
+    {
+        if (!PlayerHasTrait("player.tax")) return;
+        if (gameOver || matchOver || isGameOverScreen) return;
+        if (playerScore <= 0 || playerScore != aiScore) return;
+
+        int transfer = Mathf.RoundToInt(aiScore * 0.2f);
+        if (transfer <= 0) return;
+
+        aiScore -= transfer;
+        playerScore += transfer;
+        ShowAction($"Impôts bourgeois : égalité parfaite ! L'adversaire vous cède {transfer} pts.");
+        uiLog?.Append($"Trait Impôts bourgeois : transfert de {transfer} pts (IA → Joueur).");
+        UpdateUI();
+    }
+
+    // Audit des Morts (boss) : 1×/match, annule l'artefact que le joueur vient de jouer.
+    // Retourne true si l'artefact est annulé (il sera retiré de l'inventaire sans effet).
+    public bool Boss_TryAuditCancelArtifact()
+    {
+        if (!EnemyTraitActive("boss.audit") || traitAuditUsed) return false;
+        traitAuditUsed = true;
+        hintBanner?.Show("Audit des Morts : le Boss annule votre artefact et le confisque !");
+        uiLog?.Append("Trait Boss Audit des Morts : artefact annulé et retiré.");
+        return true;
+    }
+
     // Campagne
     private System.Random campaignRng;
     private PalierConfig.EnemyInfo currentEnemyInfo;
@@ -347,6 +562,9 @@ public class GameManager : MonoBehaviour
         opponentPortraitImage.sprite = sp;
         opponentPortraitImage.enabled = (sp != null);
         opponentPortraitImage.preserveAspect = true;
+
+        // Hover d'info ennemi (nom + description + trait) sur le portrait P2, comme sur la mini-map.
+        if (mapView) mapView.AttachHoverTo(opponentPortraitImage, info);
     }
 
 
@@ -579,6 +797,128 @@ public class GameManager : MonoBehaviour
         if (mapView) mapView.ShowEnemy(currentEnemyInfo);
 
         UpdateOpponentPortrait(currentEnemyInfo);
+
+        // ---- Traits / affixes : activation et effets de début de match ----
+        SetupTraitsForMatch();
+    }
+
+    // Règles d'activation liées au palier (0-based) :
+    // P1 : aucun trait · artefact IA 0%
+    // P2 : trait du 1er adversaire · artefact IA 20%
+    // P3 : traits des 1er et 3e adversaires · artefact IA 35%
+    // P4 : tous les adversaires ont leur trait · artefact IA 50%
+    // P5 (dernier) : trait propre du boss + 1 trait boss aléatoire · artefact IA 100%
+    void SetupTraitsForMatch()
+    {
+        // Reset des états de traits par match (le trait du personnage précédent NE persiste PAS)
+        activeEnemyTraitKeys.Clear();
+        activeEnemyTraitInfos.Clear();
+        aiArtifact = null;
+        aiArtifactUsed = false;
+        traitPoisonGlassUsedVsPlayer = false;
+        traitPoisonGlassUsedVsAI = false;
+        traitBlackSunUsed = false;
+        traitAuditUsed = false;
+        traitTideUsed = false;
+        traitTitheExtra = 0;
+        traitTitheRollStreak = 0;
+        aiHasRolledThisMatch = false;
+        playerHasRolledThisMatch = false;
+        aiTurnsThisMatch = 0;
+        playerTurnsThisMatch = 0;
+        estocUsedThisTurnPlayer = false;
+
+        int lastPalier = GetPalierCount() - 1;
+        bool traitActive =
+            (palierIndex == 1 && enemyIndex == 0) ||
+            (palierIndex == 2 && (enemyIndex == 0 || enemyIndex == 2)) ||
+            (palierIndex == 3) ||
+            (palierIndex >= lastPalier);
+
+        if (traitActive)
+        {
+            // Trait PROPRE de l'adversaire (tous paliers concernés, boss compris)
+            string ownKey = (currentEnemyInfo != null) ? NormalizeTraitKey(currentEnemyInfo.afflictionKey) : "";
+            if (!string.IsNullOrEmpty(ownKey))
+            {
+                activeEnemyTraitKeys.Add(ownKey);
+                activeEnemyTraitInfos.Add(new TraitDef(ownKey,
+                    string.IsNullOrEmpty(currentEnemyInfo.afflictionName) ? ownKey : currentEnemyInfo.afflictionName,
+                    currentEnemyInfo.afflictionDescription,
+                    currentEnemyInfo.afflictionIcon));
+                hintBanner?.Show($"Trait ennemi actif : {currentEnemyInfo.afflictionName} — {currentEnemyInfo.afflictionDescription}");
+                uiLog?.Append($"Trait ennemi actif : {currentEnemyInfo.afflictionName} ({ownKey})");
+            }
+
+            // Palier 5 : + 1 trait de Boss aléatoire EN PLUS du trait propre
+            if (palierIndex >= lastPalier)
+            {
+                var boss = TraitCatalog.BossTraits[campaignRng.Next(TraitCatalog.BossTraits.Length)];
+                activeEnemyTraitKeys.Add(boss.key);
+                activeEnemyTraitInfos.Add(boss);
+                hintBanner?.Show($"Trait de Boss : {boss.name} — {boss.desc}");
+                uiLog?.Append($"Trait de Boss ajouté : {boss.name}");
+            }
+        }
+
+        // ---- Artefact de l'adversaire (chance par palier) ----
+        float chance = 0f;
+        if (enemyArtifactChanceByPalier != null && enemyArtifactChanceByPalier.Length > 0)
+        {
+            int ci = Mathf.Clamp(palierIndex, 0, enemyArtifactChanceByPalier.Length - 1);
+            chance = Mathf.Clamp01(enemyArtifactChanceByPalier[ci]);
+        }
+
+        if (chance > 0f && campaignRng.NextDouble() < chance && artifactLibrary != null && artifactLibrary.artifacts != null)
+        {
+            // Ne retenir que les artefacts que l'IA sait réellement jouer
+            var usable = new List<Artifact>();
+            foreach (var a in artifactLibrary.artifacts)
+            {
+                if (a == null) continue;
+                var k = NormalizeTraitKey(a.effectKey);
+                foreach (var ok in AIUsableArtifactKeys)
+                    if (k == ok) { usable.Add(a); break; }
+            }
+
+            if (usable.Count > 0)
+            {
+                aiArtifact = usable[campaignRng.Next(usable.Count)];
+                hintBanner?.Show($"L'adversaire possède un artefact : « {aiArtifact.displayName} » !");
+                uiLog?.Append($"Artefact IA : {aiArtifact.displayName} ({AIArtifactKey()}).");
+            }
+        }
+
+        // Vignettes de traits des deux AddBox + inventaire de l'IA
+        RebuildTraitIcons();
+        if (aiInventory)
+        {
+            aiInventory.ClearAll();
+            if (aiArtifact != null) aiInventory.TryAdd(aiArtifact);
+        }
+        uiLog?.Append(activeEnemyTraitKeys.Count == 0
+            ? "Traits actifs de l'adversaire : aucun."
+            : $"Traits actifs de l'adversaire : {string.Join(", ", activeEnemyTraitKeys)}.");
+
+        // ---- Effets immédiats de début de match ----
+        // (les gardes EnemyTraitActive / PlayerHasTrait suffisent : le trait joueur
+        //  "Bien né" s'applique même si l'ennemi n'a aucun trait actif)
+        // Bien né (ennemi) : l'IA gagne 35 points d'office (ouverture offerte)
+        if (EnemyTraitActive("wellborn"))
+        {
+            aiScore += 35;
+            aiOpened = true;
+            uiLog?.Append("Bien né : l'ennemi démarre avec 35 points (ouvert).");
+            UpdateUI();
+        }
+        // Bien né (joueur, trait volé) : idem pour le joueur
+        if (PlayerHasTrait("wellborn"))
+        {
+            playerScore += 35;
+            playerOpened = true;
+            uiLog?.Append("Bien né (joueur) : vous démarrez avec 35 points (ouvert).");
+            UpdateUI();
+        }
     }
 
     void RefreshCampaignUI()
@@ -628,10 +968,10 @@ public class GameManager : MonoBehaviour
 
     void AdvanceToNextOpponentOrPalier()
     {
-        // ⛔ Empêche d’avancer pendant la phase d’obtention
-        if (awaitingArtifactPick)
+        // ⛔ Empêche d’avancer pendant une phase de sélection
+        if (awaitingArtifactPick || awaitingTraitPick)
         {
-            uiLog?.Append("Avance ignorée : sélection d’artefact en cours.");
+            uiLog?.Append("Avance ignorée : sélection en cours.");
             return;
         }
 
@@ -649,15 +989,24 @@ public class GameManager : MonoBehaviour
 
             if (defeatsCount >= 3)
             {
+                // Trait Résurrection : lancer le dé SUN pour revenir dans la partie
+                if (PlayerHasTrait("player.resurrection") && !resurrectionUsed)
+                {
+                    StartCoroutine(ResolveResurrection());
+                    return;
+                }
+
                 ShowGameOver("3 défaites — Campagne perdue");
                 return;
             }
         }
 
+        bool crossedPalier = false;
         enemyIndex++;
         int enemiesInThisPalier = GetEnemyCountInPalier(palierIndex);
         if (enemyIndex >= enemiesInThisPalier)
         {
+            crossedPalier = true;
             palierIndex++;
             enemyIndex = 0;
 
@@ -669,18 +1018,96 @@ public class GameManager : MonoBehaviour
                 uiLog?.Append($"Passage de palier — une défaite effacée ({defeatsCount}/3).");
             }
 
+            // (Plus d'octroi automatique de trait en fin de palier : le joueur choisit
+            //  uniquement via les phases de sélection dédiées.)
+
             if (palierIndex >= GetPalierCount())
             {
                 hintBanner?.Show("Campagne terminée ! (Tous les Paliers joués)");
                 uiLog?.Append("Campagne terminée — retour au Palier 1.");
                 palierIndex = 0;
                 defeatsCount = 0;
+                playerTraits.Clear();
+                resurrectionUsed = false;
+                RebuildTraitIcons();
             }
         }
 
         awaitingNextMatch = false;
         lastMatchWinner = "";
+
+        // Fin de palier (après la phase d'achat) : choix d'un trait parmi les ennemis vaincus
+        if (crossedPalier)
+        {
+            var options = new List<TraitDef>();
+            var seen = new HashSet<string>();
+            foreach (var e in defeatedEnemiesThisPalier)
+            {
+                if (e == null || string.IsNullOrEmpty(e.afflictionKey)) continue;
+                var key = e.afflictionKey.Trim().ToLowerInvariant();
+                if (PlayerHasTrait(key) || !seen.Add(key)) continue;
+                options.Add(new TraitDef(key, e.afflictionName, e.afflictionDescription, e.afflictionIcon));
+            }
+            defeatedEnemiesThisPalier.Clear();
+
+            if (options.Count > 0)
+            {
+                EnterTraitPick(options,
+                    "Fin de palier : choisissez le trait d'un ennemi vaincu.",
+                    StartNewMatch);
+                return;
+            }
+        }
+
         StartNewMatch();
+    }
+
+    // Résurrection : à 3 défaites, on lance le dé SUN ; 5, 10 ou SUN → on rejoue le match perdu.
+    IEnumerator ResolveResurrection()
+    {
+        resurrectionUsed = true;
+
+        // Retire le trait (consommé, réussite ou non)
+        for (int i = playerTraits.Count - 1; i >= 0; i--)
+            if (playerTraits[i].key == "player.resurrection") playerTraits.RemoveAt(i);
+        RebuildTraitIcons();
+
+        // Le dé SUN de la table (ou le premier dé disponible en secours)
+        DieView sunDie = null;
+        foreach (var d in dice) if (d != null && d.isSunDie) { sunDie = d; break; }
+        if (sunDie == null && dice.Count > 0) sunDie = dice[0];
+
+        hintBanner?.Show("Résurrection : lancez votre destin — le dé SUN décide...");
+        yield return new WaitForSeconds(0.8f);
+
+        if (sunDie != null)
+        {
+            sunDie.gameObject.SetActive(true);
+            sunDie.Roll();
+            sunDie.Pulse(0.3f, 1.2f);
+        }
+        yield return new WaitForSeconds(1.0f);
+
+        var f = sunDie != null ? sunDie.GetFace() : DieFace.Two;
+        bool success = (f == DieFace.Five || f == DieFace.Ten || f == DieFace.Sun);
+
+        if (success)
+        {
+            defeatsCount = 2; // on revient à 2 défaites et on rejoue le match perdu
+            hintBanner?.Show($"Résurrection ({(f == DieFace.Sun ? "SUN" : ((int)f).ToString())}) ! Vous rejouez la partie perdue.");
+            uiLog?.Append("Résurrection réussie — le match perdu est rejoué.");
+            awaitingNextMatch = false;
+            lastMatchWinner = "";
+            yield return new WaitForSeconds(1.0f);
+            StartNewMatch(); // même palierIndex / enemyIndex : on rejoue le même adversaire
+        }
+        else
+        {
+            hintBanner?.Show($"Résurrection échouée ({(int)f})...");
+            uiLog?.Append("Résurrection échouée — Game Over.");
+            yield return new WaitForSeconds(1.0f);
+            ShowGameOver("3 défaites — Campagne perdue");
+        }
     }
 
 
@@ -719,6 +1146,12 @@ public class GameManager : MonoBehaviour
         awaitingNextMatch = false;
         lastMatchWinner = "";
 
+        // Reset campagne du système de traits
+        playerTraits.Clear();
+        defeatedEnemiesThisPalier.Clear();
+        resurrectionUsed = false;
+        RebuildTraitIcons();
+
         StartNewMatch();
     }
 
@@ -734,6 +1167,12 @@ public class GameManager : MonoBehaviour
         if (who == Turn.AI)
         {
             aiHasBankedThisTurn = false;  // ← reset du garde-fou
+            aiTurnsThisMatch++;           // compteur pour Runes magiques (IA)
+        }
+        else
+        {
+            playerTurnsThisMatch++;       // compteur pour Runes magiques (joueur)
+            estocUsedThisTurnPlayer = false;
         }
 
         // Reset des états de Contre-Jeu à chaque changement de tour
@@ -805,8 +1244,10 @@ public class GameManager : MonoBehaviour
         // qui ne se joue que pendant le tour de l'IA).
         if (phase == Phase.WaitEnd && currentTurn == Turn.Player)
         {
+            // Ne pas écraser le message de sauvetage après un wimpout (score récupérable)
+            bool rescuePending = wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact();
             bool hasUsableNow = PlayerHasNonCounterArtifact();
-            if (hasUsableNow)
+            if (hasUsableNow && !rescuePending)
                 ShowAction("Souhaitez-vous utiliser un Artefact ? Ouvrez l’inventaire et appuyez sur USE — sinon CONTINUE.");
         }
 
@@ -836,10 +1277,12 @@ public class GameManager : MonoBehaviour
         // Après l'ouverture → objectif = score du palier, ou le score à battre si une
         // phase finale a été déclenchée (mis à jour pour les DEUX joueurs).
         int goal = finalPhase ? targetScore : WIN_THRESHOLD;
+        // Tithe of Time (boss) : le score cible du joueur est majoré
+        int playerGoal = finalPhase ? targetScore : WIN_THRESHOLD + traitTitheExtra;
 
         if (playerScoreText)
             playerScoreText.text = playerOpened
-                ? $"{playerScore} / {goal} pts"
+                ? $"{playerScore} / {playerGoal} pts"
                 : $"{playerScore} / {ENTRY_THRESHOLD} pts";
 
         if (aiScoreText)
@@ -848,6 +1291,9 @@ public class GameManager : MonoBehaviour
                 : $"{aiScore} / {ENTRY_THRESHOLD} pts";
 
         if (turnScoreText) turnScoreText.text = $"Score du tour : {turnScore}";
+
+        // Inventaire visible de l'adversaire (léger : simples assignations)
+        RefreshAIArtifactUI();
 
         // Si on est en mode sélection d’artefact, message dédié dans le bandeau
         if (awaitingArtifactPick)
@@ -920,6 +1366,9 @@ public class GameManager : MonoBehaviour
     {
         if (dice == null || dice.Count == 0) return false;
 
+        // TRAIT Happy Hour terminé : au-delà de 75 pts sur le tour, le joueur DOIT banker
+        if (EnemyTraitActive("happyhour") && turnScore > 75) return false;
+
         bool anyUnlocked = dice.Any(d => d != null && !d.isLocked);
         bool allLocked = dice.All(d => d != null && d.isLocked);
 
@@ -938,9 +1387,9 @@ public class GameManager : MonoBehaviour
 
     void ApplyButtonsState()
     {
-        // Mode sélection d’artefact prime sur tout : le choix se fait en cliquant les cartes,
+        // Mode sélection d’artefact OU de trait : le choix se fait en cliquant les cartes,
         // les boutons de jeu sont désactivés.
-        if (awaitingArtifactPick)
+        if (awaitingArtifactPick || awaitingTraitPick)
         {
             if (rollButton) rollButton.interactable = false;
             if (bankButton) bankButton.interactable = false;
@@ -1070,7 +1519,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (awaitingArtifactPick) return; // pas de sélection de dé durant la sélection d’artefact
+        if (awaitingArtifactPick || awaitingTraitPick) return; // pas de sélection de dé durant une sélection de carte
         if (gameOver || matchOver || isGameOverScreen) return;
         if (currentTurn != Turn.Player) return;
         if (phase != Phase.Normal && phase != Phase.Clause) return;
@@ -1154,8 +1603,8 @@ public class GameManager : MonoBehaviour
     void OnPressRoll()
     {
         CleanupLingeringAddedDice();
-        // Pendant la sélection d’artefact, le choix se fait en cliquant les cartes
-        if (awaitingArtifactPick) return;
+        // Pendant la sélection d’artefact ou de trait, le choix se fait en cliquant les cartes
+        if (awaitingArtifactPick || awaitingTraitPick) return;
 
         if (gameOver || matchOver || isGameOverScreen) return;
 
@@ -1174,7 +1623,10 @@ public class GameManager : MonoBehaviour
                 // (tous les dés verrouillés → relance complète obligatoire).
                 if (!CanPlayerRollInNormal())
                 {
-                    ShowAction("Sélectionne au moins un dé marquant (5/10/SUN) avant de relancer.");
+                    if (EnemyTraitActive("happyhour") && turnScore > 75)
+                        ShowAction("Happy Hour terminé : plus de 75 points sur ce tour — tu dois BANK !");
+                    else
+                        ShowAction("Sélectionne au moins un dé marquant (5/10/SUN) avant de relancer.");
                     return;
                 }
             }
@@ -1234,8 +1686,8 @@ public class GameManager : MonoBehaviour
 
     void OnPressBank()
     {
-        // Pendant la sélection d’artefact, le choix se fait en cliquant les cartes
-        if (awaitingArtifactPick) return;
+        // Pendant la sélection d’artefact ou de trait, le choix se fait en cliquant les cartes
+        if (awaitingArtifactPick || awaitingTraitPick) return;
 
         if (gameOver || matchOver || isGameOverScreen) return;
         if (currentTurn != Turn.Player || phase != Phase.Normal) return;
@@ -1276,11 +1728,37 @@ public class GameManager : MonoBehaviour
         string modBadge;
         int adjusted = ApplyScoreModsOnBank(turnScore, out modBadge);
 
+        // ---- TRAIT Boss Obole de Charon : chaque bank du joueur perd 10% ----
+        if (EnemyTraitActive("boss.obole"))
+        {
+            int before = adjusted;
+            adjusted = Mathf.RoundToInt(adjusted * 0.9f);
+            uiLog?.Append($"Trait Boss Obole de Charon : bank {before} → {adjusted} (-10%).");
+            hintBanner?.Show($"Obole de Charon : le Boss prélève sa dîme ({before} → {adjusted}).");
+        }
+
         // ==== Crédit du tour au score total du joueur ====
         playerScore += adjusted;
         turnScore = 0;
         uiLog?.Append($"Joueur banque {adjusted} points (total : {playerScore}).");
         UpdateUI();
+
+        // ---- TRAIT Verre Empoisonné (ennemi) : 1×/match, joueur > 100 pts → score divisé par 2 ----
+        if (EnemyTraitActive("poisonglass") && !traitPoisonGlassUsedVsPlayer && playerScore > 100)
+        {
+            traitPoisonGlassUsedVsPlayer = true;
+            int before = playerScore;
+            playerScore = Mathf.RoundToInt(playerScore / 2f);
+            ShowAction($"Verre Empoisonné : votre score est divisé par 2 ({before} → {playerScore}) !");
+            uiLog?.Append($"Trait Verre Empoisonné : score joueur {before} → {playerScore}.");
+            UpdateUI();
+        }
+
+        // ---- TRAIT Boss Tithe of Time : banker remet le compteur de jets à zéro ----
+        traitTitheRollStreak = 0;
+
+        // ---- TRAIT Impôts bourgeois (joueur) : égalité de scores → l'adversaire cède 20% ----
+        CheckBourgeoisTax();
 
         // Badge pour les mods "du tour"
         if (scoreModLabel)
@@ -1335,8 +1813,8 @@ public class GameManager : MonoBehaviour
 
     void OnPressEndRound()
     {
-        // Pendant la sélection d’artefact, le choix se fait en cliquant les cartes
-        if (awaitingArtifactPick) return;
+        // Pendant la sélection d’artefact ou de trait, le choix se fait en cliquant les cartes
+        if (awaitingArtifactPick || awaitingTraitPick) return;
 
         // Fenêtre de Contre-Jeu ouverte : Next = laisser l'IA continuer/terminer son tour
         if (awaitingCounterPlay)
@@ -1349,11 +1827,32 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Fin de match annoncée → Next ouvre la phase d’obtention d’artefact
+        // Fin de match annoncée → Next ouvre la phase d’obtention d’artefact.
+        // À la fin des paliers 2 et 4 (dernier adversaire), le joueur choisit d'abord
+        // un trait de joueur, AVANT la phase d'achat.
         if (awaitingVictoryNext)
         {
             awaitingVictoryNext = false;
             if (endRoundButton) endRoundButton.interactable = false;
+
+            bool lastOfPalier = enemyIndex >= GetEnemyCountInPalier(palierIndex) - 1;
+            bool palier2or4 = (palierIndex == 1 || palierIndex == 3);
+            if (lastOfPalier && palier2or4)
+            {
+                var options = new List<TraitDef>();
+                foreach (var t in TraitCatalog.PlayerTraits)
+                    if (!PlayerHasTrait(t.key)) options.Add(t);
+
+                if (options.Count > 0)
+                {
+                    int count = pendingArtifactPickCount;
+                    EnterTraitPick(options,
+                        "Fin de palier : choisissez un trait de Joueur en cliquant sur sa carte.",
+                        () => EnterArtifactPick(count));
+                    return;
+                }
+            }
+
             EnterArtifactPick(pendingArtifactPickCount);
             return;
         }
@@ -1376,6 +1875,8 @@ public class GameManager : MonoBehaviour
     // ===================== ROLL / CLAUSE / IA =====================
     IEnumerator ResolvePlayerRoll()
     {
+        bool isReroll = (phase == Phase.Normal); // relance (≠ premier jet du tour)
+
         foreach (var idx in mutableLocks) frozenLocks.Add(idx);
         mutableLocks.Clear();
         mutablePoints.Clear();
@@ -1399,6 +1900,55 @@ public class GameManager : MonoBehaviour
         yield return null;
 
         ApplyPendingFaceOverrides(lastRolledIndices); // faces forcées (dev / artefacts)
+
+        // ---- TRAIT Pistage (joueur) : le premier jet du match a 2 dés à 10 ----
+        if (!playerHasRolledThisMatch && PlayerHasTrait("tracking") && lastRolledIndices.Count >= 2)
+        {
+            dice[lastRolledIndices[0]].SetFace(DieFace.Ten);
+            dice[lastRolledIndices[1]].SetFace(DieFace.Ten);
+            ShowAction("Pistage : votre premier jet contient 2 dés de 10 !");
+        }
+        playerHasRolledThisMatch = true;
+
+        // ---- TRAIT Runes magiques (joueur) : 20% tous les 3 tours → flash aléatoire ----
+        if (!isReroll && PlayerHasTrait("runes") && playerTurnsThisMatch > 0
+            && playerTurnsThisMatch % 3 == 0 && lastRolledIndices.Count >= 3
+            && aiRng.NextDouble() < 0.20)
+        {
+            var faces = new[] { DieFace.Two, DieFace.Three, DieFace.Four, DieFace.Five, DieFace.Six, DieFace.Ten };
+            var flashFace = faces[aiRng.Next(faces.Length)];
+            for (int k = 0; k < 3; k++) dice[lastRolledIndices[k]].SetFace(flashFace);
+            ShowAction($"Runes magiques : un flash de {(int)flashFace} se matérialise !");
+            uiLog?.Append($"Trait Runes magiques (joueur) : flash de {(int)flashFace}.");
+        }
+
+        // ---- TRAIT Boss Marée du Destin : la 1re relance du joueur est annulée,
+        //      le Boss gagne la meilleure face du jet annulé ----
+        if (isReroll && !traitTideUsed && EnemyTraitActive("boss.tide"))
+        {
+            traitTideUsed = true;
+            int best = lastRolledIndices.Max(i => HighValueOf(dice[i].GetFace()));
+            aiScore += best;
+            ShowAction($"Marée du Destin : votre relance est engloutie — le Boss gagne {best} pts !");
+            uiLog?.Append($"Trait Boss Marée du Destin : +{best} au Boss, jet relancé.");
+            UpdateUI();
+            yield return new WaitForSeconds(0.9f);
+            foreach (var idx in lastRolledIndices) dice[idx].Roll(); // le vrai jet (miroir consommé)
+            yield return null;
+        }
+
+        // ---- TRAIT Boss Tithe of Time : 3 jets consécutifs sans bank → +25 au score cible ----
+        if (EnemyTraitActive("boss.tithe"))
+        {
+            traitTitheRollStreak++;
+            if (traitTitheRollStreak >= 3)
+            {
+                traitTitheRollStreak = 0;
+                traitTitheExtra += 25;
+                ShowAction($"Tithe of Time : +25 au score à atteindre (total +{traitTitheExtra}) !");
+                uiLog?.Append($"Trait Boss Tithe of Time : score cible du joueur +25 (cumul +{traitTitheExtra}).");
+            }
+        }
 
         if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
         {
@@ -1426,6 +1976,19 @@ public class GameManager : MonoBehaviour
             // --- APRÈS (laisse le choix au joueur) ---
             var remaining = lastRolledIndices.Where(i => !eval.flashLockIndices.Contains(i)).ToList();
 
+            // ---- TRAIT Boss Soleil Noir : au premier flash du joueur, la plus petite
+            //      face restante devient 2 (une seule fois) ----
+            if (EnemyTraitActive("boss.blacksun") && !traitBlackSunUsed && remaining.Count > 0)
+            {
+                traitBlackSunUsed = true;
+                int lowest = remaining[0];
+                foreach (var i in remaining)
+                    if (HighValueOf(dice[i].GetFace()) < HighValueOf(dice[lowest].GetFace())) lowest = i;
+                dice[lowest].SetFace(DieFace.Two);
+                ShowAction("Soleil Noir : votre plus petite face est corrompue en 2 !");
+                uiLog?.Append("Trait Boss Soleil Noir : un dé devient 2.");
+            }
+
             // Au lieu d'auto-locker et d’ajouter les points, on ne fait que
             // calculer les dés marquants restants pour que le joueur choisisse.
             FillEligibleFromIndices(remaining);
@@ -1449,12 +2012,28 @@ public class GameManager : MonoBehaviour
         {
             FillEligibleFromIndices(lastRolledIndices);
 
+            // ---- TRAIT Nœud Coulant (joueur) : 50% de relancer un dé si aucun dé marquant ----
+            if (eligibleLockIndices.Count == 0 && PlayerHasTrait("noose")
+                && lastRolledIndices.Count > 0 && aiRng.NextDouble() < 0.5)
+            {
+                ShowAction("Nœud Coulant : une seconde chance — un dé est relancé !");
+                yield return new WaitForSeconds(0.6f);
+                int pick = lastRolledIndices[aiRng.Next(lastRolledIndices.Count)];
+                dice[pick].Roll();
+                dice[pick].Pulse(0.22f, 1.12f);
+                yield return new WaitForSeconds(0.3f);
+                FillEligibleFromIndices(lastRolledIndices);
+            }
+
             if (eligibleLockIndices.Count == 0)
             {
-                wimpoutLostTurnScore = turnScore; // récupérable via Os du Tricheur
+                wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
                 turnScore = 0;
                 UpdateUI();
-                ShowAction("Wimpout ! Aucun point sur ce jet.");
+                if (wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact())
+                    ShowAction($"Wimpout ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts avec un artefact (USE) — sinon CONTINUE.");
+                else
+                    ShowAction("Wimpout ! Aucun point sur ce jet.");
                 uiLog?.Append("Wimpout (aucun 5/10/SUN=10 et pas de Flash).");
 
                 CheckWinConditionOnTurnEnded();
@@ -1525,10 +2104,23 @@ public class GameManager : MonoBehaviour
         if (matchedFlashFace)
         { ShowAction($"Clause : {(int)currentFlashFace} retombe — appuie sur ROLL pour continuer."); SetPhase(Phase.Clause); yield break; }
 
-        wimpoutLostTurnScore = turnScore; // récupérable via Os du Tricheur
+        // ---- TRAIT Coup d'estoc (joueur) : la Clause perdue offre une relance exceptionnelle ----
+        if (PlayerHasTrait("estoc") && !estocUsedThisTurnPlayer)
+        {
+            estocUsedThisTurnPlayer = true;
+            ShowAction("Coup d'estoc : le dé perdant vous accorde une relance — appuie sur ROLL !");
+            uiLog?.Append("Trait Coup d'estoc (joueur) : relance exceptionnelle de la Clause.");
+            SetPhase(Phase.Clause);
+            yield break;
+        }
+
+        wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
         turnScore = 0;
         UpdateUI();
-        ShowAction("Wimpout pendant Clause.");
+        if (wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact())
+            ShowAction($"Wimpout pendant Clause ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts avec un artefact (USE) — sinon CONTINUE.");
+        else
+            ShowAction("Wimpout pendant Clause.");
         CheckWinConditionOnTurnEnded();
         yield return new WaitForSeconds(0.25f);
         SetPhase(Phase.WaitEnd);
@@ -1547,6 +2139,20 @@ public class GameManager : MonoBehaviour
         {
             var a = playerInventory.GetAt(i);
             if (a != null && a.type == ArtifactType.ContreJeu) return true;
+        }
+        return false;
+    }
+
+    // Le joueur possède-t-il un artefact capable de SAUVER un tour perdu
+    // (Transformation ou Relance : Fortifiant, Balance, Miroir, Os du Tricheur, Temps...) ?
+    public bool PlayerHasRescueArtifact()
+    {
+        if (playerInventory == null) return false;
+        for (int i = 0; i < playerInventory.Count; i++)
+        {
+            var a = playerInventory.GetAt(i);
+            if (a != null && (a.type == ArtifactType.Transformation || a.type == ArtifactType.Relance))
+                return true;
         }
         return false;
     }
@@ -1880,11 +2486,48 @@ public class GameManager : MonoBehaviour
         }, "Poison douteux : choisis un dé posé de l'IA à affaiblir (-1).");
     }
 
+    // Applique l'artefact de score de l'IA (Dot de mariage / Livre des Comptes) sur sa bank.
+    int ApplyAIArtifactOnBank(int baseGain)
+    {
+        if (aiArtifact == null || aiArtifactUsed) return baseGain;
+
+        var k = AIArtifactKey();
+        if (k == "score.marriage_dot")
+        {
+            aiArtifactUsed = true;
+            int boosted = baseGain * 2;
+            ShowAction($"L'adversaire utilise « {aiArtifact.displayName} » : sa bank est doublée ({baseGain} → {boosted}) !");
+            uiLog?.Append($"Artefact IA : {aiArtifact.displayName} (bank ×2).");
+            return boosted;
+        }
+        if (k == "score.funeral_ledger" && baseGain >= 70)
+        {
+            aiArtifactUsed = true;
+            int boosted = Mathf.RoundToInt(baseGain * 1.5f);
+            ShowAction($"L'adversaire utilise « {aiArtifact.displayName} » : sa bank gagne +50% ({baseGain} → {boosted}) !");
+            uiLog?.Append($"Artefact IA : {aiArtifact.displayName} (+50%).");
+            return boosted;
+        }
+        return baseGain;
+    }
+
     IEnumerator RunAITurn()
     {
         if (gameOver || matchOver || isGameOverScreen) yield break;
         if (aiHasBankedThisTurn) yield break;
         yield return new WaitForSeconds(AI_DELAY);
+
+        // Artefact IA : Ticket d'entrée → ouverture immédiate (+35)
+        if (aiArtifact != null && !aiArtifactUsed && !aiOpened && AIArtifactKey() == "score.entry_ticket")
+        {
+            aiArtifactUsed = true;
+            aiScore += ENTRY_THRESHOLD;
+            aiOpened = true;
+            ShowAction($"L'adversaire utilise « {aiArtifact.displayName} » : +{ENTRY_THRESHOLD} pts et ouverture immédiate !");
+            uiLog?.Append($"Artefact IA : {aiArtifact.displayName} (ouverture).");
+            UpdateUI();
+            yield return new WaitForSeconds(0.9f);
+        }
 
         // ⚠️ Pas de fenêtre de contre-jeu AVANT le premier lancé : l'IA lance d'abord.
         yield return StartCoroutine(ResolveAIRoll(allUnlocked: true));
@@ -1942,12 +2585,27 @@ public class GameManager : MonoBehaviour
                 int aiGain = Mathf.RoundToInt(turnScore * aiBankMultiplier);
                 if (aiBankMultiplier < 1f)
                     uiLog?.Append($"Bourse percée : bank IA {turnScore} → {aiGain} (×{aiBankMultiplier:0.##}).");
+                aiGain = ApplyAIArtifactOnBank(aiGain); // Dot de mariage / Livre des Comptes de l'IA
                 aiScore += aiGain;
                 turnScore = 0;
                 aiBankMultiplier = 1f; // consommé
                 UpdateUI();
 
                 if (!aiOpened && aiScore >= ENTRY_THRESHOLD) aiOpened = true;
+
+                // ---- TRAIT Verre Empoisonné (joueur, volé) : IA > 100 pts → score divisé par 2 ----
+                if (PlayerHasTrait("poisonglass") && !traitPoisonGlassUsedVsAI && aiScore > 100)
+                {
+                    traitPoisonGlassUsedVsAI = true;
+                    int before = aiScore;
+                    aiScore = Mathf.RoundToInt(aiScore / 2f);
+                    ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");
+                    uiLog?.Append($"Trait Verre Empoisonné (joueur) : score IA {before} → {aiScore}.");
+                    UpdateUI();
+                }
+
+                // ---- TRAIT Impôts bourgeois : égalité de scores après la bank IA ----
+                CheckBourgeoisTax();
 
                 bool finalPhaseAvant = finalPhase;
                 Turn challengerAvant = challenger;
@@ -2026,6 +2684,47 @@ public class GameManager : MonoBehaviour
         foreach (var idx in indicesToRoll) dice[idx].Roll();
         yield return new WaitForSeconds(0.1f);
 
+        // ---- TRAIT Pistage (ennemi) : son premier jet de la partie a 2 dés de 10 ----
+        if (!aiHasRolledThisMatch && EnemyTraitActive("tracking") && indicesToRoll.Count >= 2)
+        {
+            dice[indicesToRoll[0]].SetFace(DieFace.Ten);
+            dice[indicesToRoll[1]].SetFace(DieFace.Ten);
+            hintBanner?.Show("Pistage : le Chasseur ouvre avec 2 dés de 10 !");
+            uiLog?.Append("Trait Pistage : premier jet IA avec 2×10.");
+        }
+        aiHasRolledThisMatch = true;
+
+        // ---- TRAIT Runes magiques (ennemi) : 20% tous les 3 tours → flash aléatoire ----
+        if (allUnlocked && EnemyTraitActive("runes") && aiTurnsThisMatch > 0
+            && aiTurnsThisMatch % 3 == 0 && indicesToRoll.Count >= 3
+            && aiRng.NextDouble() < 0.20)
+        {
+            var runeFaces = new[] { DieFace.Two, DieFace.Three, DieFace.Four, DieFace.Five, DieFace.Six, DieFace.Ten };
+            var runeFace = runeFaces[aiRng.Next(runeFaces.Length)];
+            for (int k = 0; k < 3; k++) dice[indicesToRoll[k]].SetFace(runeFace);
+            hintBanner?.Show($"Runes magiques : la Magicienne invoque un flash de {(int)runeFace} !");
+            uiLog?.Append($"Trait Runes magiques : flash IA de {(int)runeFace}.");
+        }
+
+        // ---- Artefact IA : Balance de la justice (2→5, 6→10) si au moins 2 dés concernés ----
+        if (aiArtifact != null && !aiArtifactUsed && AIArtifactKey() == "transform.balance")
+        {
+            int balanceTargets = indicesToRoll.Count(i =>
+                dice[i].GetFace() == DieFace.Two || dice[i].GetFace() == DieFace.Six);
+            if (balanceTargets >= 2)
+            {
+                aiArtifactUsed = true;
+                foreach (var i in indicesToRoll)
+                {
+                    var f = dice[i].GetFace();
+                    if (f == DieFace.Two) dice[i].SetFace(DieFace.Five);
+                    else if (f == DieFace.Six) dice[i].SetFace(DieFace.Ten);
+                }
+                hintBanner?.Show($"L'adversaire utilise « {aiArtifact.displayName} » : ses 2 et 6 se transforment !");
+                uiLog?.Append($"Artefact IA : {aiArtifact.displayName} ({balanceTargets} dés transformés).");
+                yield return new WaitForSeconds(0.7f);
+            }
+        }
 
         if (ENABLE_SUPERNOVA && indicesToRoll.Count == 5 && indicesToRoll.All(i => dice[i].GetFace() == DieFace.Ten))
         { EndMatch(AI_NAME); yield break; }
@@ -2123,6 +2822,65 @@ public class GameManager : MonoBehaviour
 
         var evalSingles = EvaluateRoll(indicesToRoll, scoreSingles: true);
 
+        // ---- TRAIT Nœud Coulant (ennemi) : 50% de relancer un dé si aucun dé marquant ----
+        if (!evalSingles.anyScoring && !evalSingles.createdFlash
+            && EnemyTraitActive("noose") && indicesToRoll.Count > 0
+            && aiRng.NextDouble() < 0.5)
+        {
+            hintBanner?.Show("Nœud Coulant : le Pendu relance un dé !");
+            uiLog?.Append("Trait Nœud Coulant : relance d'un dé IA.");
+            yield return new WaitForSeconds(0.6f);
+            int pick = indicesToRoll[aiRng.Next(indicesToRoll.Count)];
+            dice[pick].Roll();
+            dice[pick].Pulse(0.22f, 1.12f);
+            yield return new WaitForSeconds(0.4f);
+            evalSingles = EvaluateRoll(indicesToRoll, scoreSingles: true);
+
+            if (evalSingles.createdFlash)
+            {
+                // Le dé relancé complète un flash : on le verrouille avec ses points (sans Clause)
+                foreach (var i in evalSingles.lockedThisRoll) dice[i].SetLocked(true);
+                turnScore += evalSingles.pointsGained;
+                UpdateUI();
+                SetPhase(Phase.AITurnPlaying);
+                yield break;
+            }
+        }
+
+        // ---- Artefact IA : Os du Tricheur / Temps niv.1 → relance sur wimpout ----
+        if (!evalSingles.anyScoring && !evalSingles.createdFlash
+            && aiArtifact != null && !aiArtifactUsed && indicesToRoll.Count > 0
+            && (AIArtifactKey() == "reroll_one_die" || AIArtifactKey() == "reroll_turn"))
+        {
+            aiArtifactUsed = true;
+            bool rerollAll = AIArtifactKey() == "reroll_turn";
+            ShowAction($"L'adversaire utilise « {aiArtifact.displayName} » : relance !");
+            uiLog?.Append($"Artefact IA : {aiArtifact.displayName} (relance {(rerollAll ? "du jet" : "d'un dé")}).");
+            yield return new WaitForSeconds(0.6f);
+
+            if (rerollAll)
+            {
+                foreach (var i in indicesToRoll) dice[i].Roll();
+            }
+            else
+            {
+                int pick = indicesToRoll[aiRng.Next(indicesToRoll.Count)];
+                dice[pick].Roll();
+                dice[pick].Pulse(0.22f, 1.12f);
+            }
+            yield return new WaitForSeconds(0.4f);
+            evalSingles = EvaluateRoll(indicesToRoll, scoreSingles: true);
+
+            if (evalSingles.createdFlash)
+            {
+                foreach (var i in evalSingles.lockedThisRoll) dice[i].SetLocked(true);
+                turnScore += evalSingles.pointsGained;
+                UpdateUI();
+                SetPhase(Phase.AITurnPlaying);
+                yield break;
+            }
+        }
+
         if (!evalSingles.anyScoring)
         {
             turnScore = 0;
@@ -2161,6 +2919,8 @@ public class GameManager : MonoBehaviour
 
     IEnumerator AutoResolveClause(bool isAI)
     {
+        bool estocRetryUsed = false; // Coup d'estoc (Chevalière) : une relance exceptionnelle par Clause
+
         var indicesToRoll = dice.Select((d, i) => (d, i)).Where(t => t.d != null && !t.d.isLocked).Select(t => t.i).ToList();
         if (indicesToRoll.Count == 0)
         {
@@ -2221,6 +2981,16 @@ public class GameManager : MonoBehaviour
                 continue;
             }
 
+            // ---- TRAIT Coup d'estoc (ennemi) : la Chevalière relance le dé perdant (1×/Clause) ----
+            if (isAI && EnemyTraitActive("estoc") && !estocRetryUsed)
+            {
+                estocRetryUsed = true;
+                hintBanner?.Show("Coup d'estoc : la Chevalière relance le dé perdant !");
+                uiLog?.Append("Trait Coup d'estoc : relance exceptionnelle de la Clause IA.");
+                yield return new WaitForSeconds(CLAUSE_REPEAT_DELAY);
+                continue;
+            }
+
             // Wimpout
             if (!isAI) wimpoutLostTurnScore = turnScore; // récupérable via Os du Tricheur
             turnScore = 0;
@@ -2247,7 +3017,8 @@ public class GameManager : MonoBehaviour
 
         if (!finalPhase)
         {
-            if (playerScore >= palierWin)
+            // Tithe of Time (boss) : le score cible du JOUEUR est majoré de traitTitheExtra
+            if (playerScore >= palierWin + traitTitheExtra)
             {
                 finalPhase = true; targetScore = playerScore; challenger = Turn.Player;
                 ShowAction($"Le Joueur atteint {playerScore} ! L’IA doit dépasser.");
@@ -2286,6 +3057,12 @@ public class GameManager : MonoBehaviour
         awaitingNextMatch = true;
         lastMatchWinner = winner;
 
+        // Le trait de l'adversaire s'éteint avec le match (aucun effet résiduel,
+        // et l'AddBoxP2 se vide immédiatement)
+        activeEnemyTraitKeys.Clear();
+        activeEnemyTraitInfos.Clear();
+        RebuildTraitIcons();
+
         // Un artefact "armé" (ciblage de dé en attente) ne doit pas survivre à la fin du match
         CancelExternalDiePick();
         ClearExternalDiePick();
@@ -2300,6 +3077,10 @@ public class GameManager : MonoBehaviour
 
         if (winner == PLAYER_NAME)
         {
+            // Trait de l'ennemi vaincu mémorisé pour le choix de fin de palier
+            if (currentEnemyInfo != null && !string.IsNullOrEmpty(currentEnemyInfo.afflictionKey))
+                defeatedEnemiesThisPalier.Add(currentEnemyInfo);
+
             // 👉 Annonce de victoire ; le joueur appuie sur Next pour ouvrir la phase d’obtention (3 artefacts)
             awaitingVictoryNext = true;
             pendingArtifactPickCount = 3;
@@ -2576,6 +3357,89 @@ public class GameManager : MonoBehaviour
         }
 
         uiLog?.Append("Sélection d’artefact ouverte.");
+    }
+
+    // ===================== TRAITS : SÉLECTION (cartes cliquables) =====================
+    void EnterTraitPick(List<TraitDef> options, string bannerMsg, Action onDone)
+    {
+        if (options == null || options.Count == 0) { onDone?.Invoke(); return; }
+        if (awaitingTraitPick) { onDone?.Invoke(); return; }
+
+        awaitingTraitPick = true;
+        afterTraitPick = onDone;
+
+        HideDice(true);
+        SetTurnScoreVisible(false);
+
+        offeredTraits.Clear();
+        offeredTraits.AddRange(options);
+
+        foreach (var v in offeredTraitCards) if (v) Destroy(v.gameObject);
+        offeredTraitCards.Clear();
+
+        var root = GetArtifactRoot();
+        if (root && artifactCardPrefab)
+        {
+            for (int i = 0; i < offeredTraits.Count; i++)
+            {
+                var view = Instantiate(artifactCardPrefab, root);
+                view.UpdateMode(ArtifactCardMode.Selection);
+                view.SetTooltip(EnsureTooltip());
+                view.BindRaw(offeredTraits[i].name, offeredTraits[i].desc, GetTraitIcon(offeredTraits[i]), "Trait");
+
+                int captured = i;
+                view.onClicked = _ => SelectTrait(captured);
+                offeredTraitCards.Add(view);
+            }
+        }
+
+        hintBanner?.Show(bannerMsg);
+        if (turnLabel) turnLabel.text = bannerMsg;
+        ApplyButtonsState();
+    }
+
+    void SelectTrait(int index)
+    {
+        if (!awaitingTraitPick) return;
+        if (index < 0 || index >= offeredTraits.Count) return;
+
+        // Durcissement : désarme immédiatement TOUTES les cartes pour qu'aucun
+        // autre clic/callback ne puisse ajouter un second trait.
+        foreach (var v in offeredTraitCards) if (v) v.onClicked = null;
+
+        var chosen = offeredTraits[index];
+        if (!PlayerHasTrait(chosen.key))
+        {
+            playerTraits.Add(chosen);
+            uiLog?.Append($"Trait acquis : {chosen.name} ({chosen.key}) — total joueur : {playerTraits.Count}.");
+        }
+        else
+        {
+            uiLog?.Append($"Trait déjà possédé : {chosen.name} ({chosen.key}).");
+        }
+
+        hintBanner?.Show($"Trait acquis : « {chosen.name} ».");
+        RebuildTraitIcons();
+
+        ExitTraitPick();
+    }
+
+    void ExitTraitPick()
+    {
+        // La description au survol ne doit pas rester affichée après le choix
+        if (artifactTooltip) artifactTooltip.Hide();
+
+        foreach (var v in offeredTraitCards) if (v) Destroy(v.gameObject);
+        offeredTraitCards.Clear();
+        offeredTraits.Clear();
+        awaitingTraitPick = false;
+
+        HideDice(false);
+        SetTurnScoreVisible(true);
+
+        var cb = afterTraitPick;
+        afterTraitPick = null;
+        cb?.Invoke();
     }
 
     // Utilisable si on est après au moins un jet du joueur
@@ -3298,6 +4162,17 @@ public class GameManager : MonoBehaviour
         SetPhase(Phase.Clause);
     }
 
+    // Restaure le score du tour perdu au wimpout (l'artefact vient de sauver le tour).
+    void RestoreWimpoutScoreIfAny()
+    {
+        if (wimpoutLostTurnScore > 0 && turnScore == 0)
+        {
+            turnScore = wimpoutLostTurnScore;
+            wimpoutLostTurnScore = 0;
+            uiLog?.Append($"Artefact : tour sauvé, score du tour restauré ({turnScore}).");
+        }
+    }
+
     public void Artifacts_ReevaluateAfterDiceChanged(string banner = null)
     {
         // Recalcule ce qui est sélectionnable parmi les dés NON verrouillés
@@ -3305,12 +4180,33 @@ public class GameManager : MonoBehaviour
                         .Where(t => t.d != null && !t.d.isLocked)
                         .Select(t => t.i).ToList();
 
-        FillEligibleFromIndices(unlocked); // ta méthode d'origine calcule eligibleLockIndices + points. :contentReference[oaicite:2]{index=2}
+        // 1) Un contre-jeu/transfo (ex: Miroir) peut avoir CRÉÉ un FLASH parmi les dés libres :
+        //    on le détecte et on le déclenche en priorité (3 identiques, ou paire + SUN).
+        if (!flashPendingResolution)
+        {
+            var evalFlash = EvaluateRoll(unlocked, scoreSingles: false);
+            if (evalFlash.createdFlash && evalFlash.flashLockIndices.Count == 3)
+            {
+                // Si le tour était perdu, le flash le sauve : on restaure d'abord le score.
+                if (phase == Phase.WaitEnd) RestoreWimpoutScoreIfAny();
+                Artifacts_CreateFlashFromIndices(evalFlash.flashLockIndices, evalFlash.flashFace);
+                if (!string.IsNullOrEmpty(banner)) uiLog?.Append(banner);
+                ApplyButtonsState();
+                UpdateUI();
+                return;
+            }
+        }
 
-        // Si on était bloqué en WaitEnd et qu’on a maintenant du marquant, on rend la main au joueur
-        // pour qu’il puisse cliquer le (ou les) dés transformés.
+        // 2) Sinon, on calcule les dés marquants (singles) disponibles.
+        FillEligibleFromIndices(unlocked);
+
+        // Si on était bloqué en WaitEnd (tour perdu) et qu’on a maintenant du marquant,
+        // on rend la main au joueur ET on RESTAURE le score perdu au wimpout.
         if (phase == Phase.WaitEnd && eligibleLockIndices.Count > 0)
         {
+            RestoreWimpoutScoreIfAny();
+            if (turnScore > 0)
+                ShowAction($"Tour sauvé ! Score restauré ({turnScore} pts) — sélectionne un dé marquant.");
             SetPhase(Phase.Normal);
             if (!string.IsNullOrEmpty(banner)) ShowAction(banner);
         }
@@ -3913,13 +4809,24 @@ public class GameManager : MonoBehaviour
         if (aiHasBankedThisTurn) yield break;
         aiHasBankedThisTurn = true;
 
-        aiScore += Mathf.RoundToInt(turnScore * aiBankMultiplier);     // ajoute UNE SEULE FOIS (malus Contre-Jeu éventuel)
+        aiScore += ApplyAIArtifactOnBank(Mathf.RoundToInt(turnScore * aiBankMultiplier));     // ajoute UNE SEULE FOIS (malus Contre-Jeu + artefact IA)
         turnScore = 0;
         aiBankMultiplier = 1f;
         UpdateUI();
 
         if (!aiOpened && aiScore >= ENTRY_THRESHOLD)
             aiOpened = true;
+
+        // Traits : Verre Empoisonné (joueur) + Impôts bourgeois
+        if (PlayerHasTrait("poisonglass") && !traitPoisonGlassUsedVsAI && aiScore > 100)
+        {
+            traitPoisonGlassUsedVsAI = true;
+            int before = aiScore;
+            aiScore = Mathf.RoundToInt(aiScore / 2f);
+            ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");
+            UpdateUI();
+        }
+        CheckBourgeoisTax();
 
         // Sauvegarde d'état avant recalcul
         bool wasFinal = finalPhase;

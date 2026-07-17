@@ -58,4 +58,22 @@ public class MapView : MonoBehaviour
         }
         if (enemyPanelInstance) enemyPanelInstance.Hide();
     }
+
+    /// <summary>
+    /// Attache (ou met à jour) le hover d'info ennemi sur une Image externe — ex : le
+    /// grand portrait P2 près de la table — en réutilisant le même EnemyPanel partagé.
+    /// </summary>
+    public void AttachHoverTo(Image target, PalierConfig.EnemyInfo info)
+    {
+        if (!target) return;
+
+        target.raycastTarget = true; // nécessaire pour recevoir le survol
+
+        var hover = target.GetComponent<MapEnemyHover>();
+        if (!hover) hover = target.gameObject.AddComponent<MapEnemyHover>();
+
+        EnsurePanelInstance();
+        hover.enabled = (info != null);
+        hover.Bind(enemyPanelInstance, info);
+    }
 }

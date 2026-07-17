@@ -86,7 +86,9 @@ public class ApothecaryFortifierEffect : IArtifactEffect
             };
             gm.dice[dieIndex].SetFace(newF);
 
-            gm.Artifacts_RefreshEligibilityAndUI();
+            // Réévaluation complète : si le tour était perdu (WaitEnd) et que le dé
+            // transformé devient marquant, le score du wimpout est restauré.
+            gm.Artifacts_ReevaluateAfterDiceChanged("Fortifiant : dé transformé — sélectionne un 5/10/SUN.");
             onConsumed?.Invoke();
         }, "Fortifiant : choisis un dé à améliorer (+1).");
     }
@@ -170,7 +172,7 @@ public class MirrorEffect : IArtifactEffect
 
     public void BeginUse(GameManager gm, System.Action onConsumed)
     {
-        // 1) choisir la source
+        // 1) choisir la SOURCE : n'importe quel dé (sa face sera copiée)
         gm.BeginExternalDiePick(
             i => i >= 0 && i < gm.dice.Count && gm.dice[i] != null,
             srcIdx =>
@@ -178,23 +180,28 @@ public class MirrorEffect : IArtifactEffect
                 var src = gm.dice[srcIdx];
                 var srcFace = src.GetFace();
 
-                gm.hintBanner?.Show("Miroir : choisis la cible.");
-                // 2) choisir la cible (≠ source)
+                gm.hintBanner?.Show($"Miroir : source = {(srcFace == DieFace.Sun ? "SUN" : ((int)srcFace).ToString())}. Choisis le dé cible (non verrouillé).");
+                // 2) choisir la CIBLE : un dé NON verrouillé différent de la source
                 gm.BeginExternalDiePick(
-                    j => j >= 0 && j < gm.dice.Count && gm.dice[j] != null && j != srcIdx,
+                    j => j >= 0 && j < gm.dice.Count && gm.dice[j] != null && j != srcIdx
+                         && (!gm.dice[j].isLocked || gm.IsDieSelectedThisRoll(j)),
                     dstIdx =>
                     {
+                        // Si la cible était sélectionnée ce jet, on annule d'abord sa sélection
+                        gm.Artifact_TryUnselectDie(dstIdx);
+
                         var dst = gm.dice[dstIdx];
                         dst.SetFace(srcFace); // copie immédiate
 
-                        // Recalcule les éligibilités et, si on était en WaitEnd et que ça crée du marquant, repasse en Normal
+                        // Recalcule les éligibilités ; si le tour était perdu (WaitEnd) et que la
+                        // copie crée du marquant, le score du wimpout est restauré.
                         gm.Artifacts_ReevaluateAfterDiceChanged("Miroir : face copiée — tu peux sélectionner/continuer.");
                         onConsumed?.Invoke();
                     },
-                    "Miroir : clique la cible."
+                    "Miroir : clique le dé cible."
                 );
             },
-            "Miroir : clique la source."
+            "Miroir : clique le dé source (sa face sera copiée)."
         );
     }
 }
