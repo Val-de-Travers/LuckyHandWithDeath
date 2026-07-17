@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a9d54c3a0bc974047a9c259572f1af87, type: 3}
+  m_Name: JusticeBalance
+  m_EditorClassIdentifier: Assembly-CSharp::Artifact
+  id: justice_balance
+  displayName: Balance de la justice
+  description: "transforme les d\xE9s 2 \u2192 5 et 6 \u2192 10"
+  icon: {fileID: 21300000, guid: ed49be866f560164684144f15b836a68, type: 3}
+  rarity: 1
+  type: 2
+  effectKey: transform.balance

@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 964c94de6a3a7a84db859c81c4a3b34c, type: 3}
+  m_Name: EnemyLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyLibrary
+  allEnemies:
+  - name: Le Pendu
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3657348073803524614, guid: ca371a66dac716642a11efc6e351c591, type: 3}
+    description: Il a encore la corde au cou et les yeux rouges.
+    afflictionName: "N\u0153ud Coulant"
+    afflictionDescription: "\xC0 chaque relance de 1 d\xE9, 10% qu\u2019un d\xE9
+      tombe \xE0 2."
+    afflictionKey: 
+  - name: La Magicienne
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
+    description: "Il a mal lanc\xE9 un sort."
+    afflictionName: Runes magiques
+    afflictionDescription: "Elle a lanc\xE9 un sort interdit. Sa confr\xE9rie la
+      donc faite ex\xE9cuter."
+    afflictionKey: 
+  - name: L'Alchimiste
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
+    description: "Il a mal r\xE9alis\xE9 une potion et le client s'est retourn\xE9
+      contre lui en le poignardant."
+    afflictionName: "Potion sp\xE9ciale"
+    afflictionDescription: "Il a mal r\xE9alis\xE9 une potion pour un client et ce
+      dernier c\u2019est veng\xE9 en le poignardant \xE0 la sortie de son \xE9choppe."
+    afflictionKey: 
+  - name: Le Tavernier
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
+    description: "Il a \xE9t\xE9 \xE9cras\xE9 par ses tonneaux de bi\xE8re lors d\u2019un
+      changement de service."
+    afflictionName: "Happy Hour termin\xE9"
+    afflictionDescription: "Il a \xE9t\xE9 \xE9cras\xE9 par ses tonneaux de bi\xE8re
+      lors d\u2019un changement de fut de bi\xE8re lors du service."
+    afflictionKey: 
+  - name: Le Chasseur
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
+    description: "Il a tr\xE9buch\xE9 sur son pi\xE8ge \xE0 ours la t\xEAte la premi\xE8re."
+    afflictionName: 'Pistage '
+    afflictionDescription: "Son premier jet de la partie aura 2 d\xE9s de 10 "
+    afflictionKey: 
+  - name: "La Chevali\xE8re"
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3657348073803524614, guid: ca371a66dac716642a11efc6e351c591, type: 3}
+    description: "Elle a \xE9t\xE9 transperc\xE9 d\u2019un coup d\u2019\xE9p\xE9e
+      car la noblesse locale a d\xE9couvert qu\u2019elle \xE9tait une femme."
+    afflictionName: "Coup d\u2019estoc"
+    afflictionDescription: "En cas de d\xE9faite lors d\u2019une Confirmation pour
+      un Brelan, elle peut relancer exceptionnellement le d\xE9 perdant."
+    afflictionKey: 
+  - name: "Le Ma\xEEtre Pigeonnier"
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
+    description: "Il a subit une r\xE9volte de ses pigeons voyageurs et a les yeux
+      crev\xE9s."
+    afflictionName: "Lanc\xE9 de graines"
+    afflictionDescription: 
+    afflictionKey: 
+  - name: L'Assassin
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
+    description: "Il s'est tromp\xE9 de breuvage o\xF9 il avait renvers\xE9 le poison
+      dedans."
+    afflictionName: "Verre empoisonn\xE9 "
+    afflictionDescription: "1 fois dans la partie si l\u2019adversaire d\xE9passe
+      100 points, son score final est divis\xE9 par 2."
+    afflictionKey: 
+  - name: L'Amoureux
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3657348073803524614, guid: ca371a66dac716642a11efc6e351c591, type: 3}
+    description: "Il s\u2019est donn\xE9 la mort en constatant que sa promise la
+      trompait."
+    afflictionName: Lettre de rupture
+    afflictionDescription: 
+    afflictionKey: 
+  - name: Le Noble
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
+    description: "D\xE9capit\xE9 par son personnel, il vous regarde avec d\xE9dains
+      malgr\xE9 le fait qu'il n'ait plus de t\xEAte."
+    afflictionName: "Bien n\xE9"
+    afflictionDescription: "Il gagne 35 points d\u2019office sur ses 3 premiers jets."
+    afflictionKey: 
+  - name: Le Sorcier
+    icon: {fileID: -8820945892013468599, guid: 3606ee7c127231948a1f513972ecb9fd, type: 3}
+    portrait: {fileID: 3178993981933596611, guid: f6bd0815b3c25f24eb21f0dc1cfbbff7, type: 3}
+    description: 
+    afflictionName: 
+    afflictionDescription: 
+    afflictionKey: 

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: RulesConfig
+  m_EditorClassIdentifier: Assembly-CSharp::RulesConfig
+  entryThreshold: 35
+  winThreshold: 300
+  aiDelay: 2
+  clauseRepeatDelay: 3
+  clauseStartDelay: 3
+  enableSupernova: 1
+  allowFreightTrains: 1
+  instantWinOnSixes: 1
+  aiBankThresholdMany: 25
+  aiBankThresholdFew: 20
+  aiBankThresholdOne: 15
+  aiRandomJitterMax: 6
+  aiBehindBias: 3
