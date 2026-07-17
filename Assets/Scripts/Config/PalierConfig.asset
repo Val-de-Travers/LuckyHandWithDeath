@@ -14,52 +14,106 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PalierConfig
   paliers:
   - palierName: Palier 1
+    winScore: 150
+    expectedEnemyCount: 3
+    enemies:
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+  - palierName: Palier 2
+    winScore: 200
+    expectedEnemyCount: 3
+    enemies:
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+    - name: 
+      icon: {fileID: 0}
+      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
+  - palierName: Palier 3
     winScore: 300
     expectedEnemyCount: 3
     enemies:
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
-  - palierName: Palier 2
-    winScore: 500
-    expectedEnemyCount: 3
-    enemies:
-    - name: 
-      portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
-  - palierName: Palier 3
-    winScore: 700
-    expectedEnemyCount: 3
-    enemies:
-    - name: 
-      portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
   - palierName: Palier 4
-    winScore: 900
-    expectedEnemyCount: 3
+    winScore: 450
+    expectedEnemyCount: 2
     enemies:
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 
   - palierName: Palier 5
-    winScore: 1200
+    winScore: 600
     expectedEnemyCount: 1
     enemies:
     - name: 
+      icon: {fileID: 0}
       portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
-    - name: 
-      portrait: {fileID: 0}
+      description: 
+      afflictionName: 
+      afflictionDescription: 
+      afflictionKey: 

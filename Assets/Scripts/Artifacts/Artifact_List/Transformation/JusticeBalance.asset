@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: justice_balance
   displayName: Balance de la justice
-  description: "transforme les d\xE9s 2 \u2192 5 et 6 \u2192 10"
+  description: "Transforme les d\xE9s 2 en 5 et 6 en 10"
   icon: {fileID: 21300000, guid: ed49be866f560164684144f15b836a68, type: 3}
   rarity: 1
   type: 2

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: time_artifact_niv1
   displayName: Artefact du Temps Niv1
-  description: Permet de relancer son jet.
+  description: "Permet de refaire un lanc\xE9."
   icon: {fileID: 21300000, guid: fed7f44431520e64c8fd40605e68e7fd, type: 3}
   rarity: 0
   type: 0
