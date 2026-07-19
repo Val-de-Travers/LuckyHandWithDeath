@@ -1292,10 +1292,33 @@ MonoBehaviour:
   devDestroyCurrentArtifactButton: {fileID: 259515468}
   counterPlayTimeout: 3
   counterPlayTimerBar: {fileID: 1985382192}
+  playerTraitLibrary: {fileID: 11400000, guid: 4435b0094b1eccf4e81a8c904fd5e031, type: 2}
+  bossTraitLibrary: {fileID: 11400000, guid: aaf38237fccbd9e44be96e1c8f8f641d, type: 2}
   playerTraitsIconsRoot: {fileID: 984049099}
   aiTraitsIconsRoot: {fileID: 292912196}
   traitIconSize: {x: 90, y: 90}
-  traitIcons: []
+  traitIcons:
+  - key: boss.obole
+    label: Obole de Charon
+    icon: {fileID: 0}
+  - key: boss.blacksun
+    label: Soleil Noir
+    icon: {fileID: 0}
+  - key: boss.audit
+    label: Audit des Morts
+    icon: {fileID: 0}
+  - key: boss.tide
+    label: "Mar\xE9e du Destin"
+    icon: {fileID: 0}
+  - key: boss.tithe
+    label: Tithe of Time
+    icon: {fileID: 0}
+  - key: player.tax
+    label: "Imp\xF4ts bourgeois"
+    icon: {fileID: 0}
+  - key: player.resurrection
+    label: "R\xE9surrection"
+    icon: {fileID: 0}
   aiArtifactIcon: {fileID: 1316114755}
   aiArtifactLabel: {fileID: 1987315543}
   aiInventory: {fileID: 1574682685}
@@ -8189,6 +8212,58 @@ RectTransform:
   m_AnchoredPosition: {x: -695.59, y: -55.401}
   m_SizeDelta: {x: 384, y: 172}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1290795757
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1290795759}
+  - component: {fileID: 1290795758}
+  m_Layer: 0
+  m_Name: ArtifactDropZone
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1290795758
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1290795757}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c3f392b3dca0344eafd1b3e379d5c98, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactDropZone
+  highlight: {fileID: 0}
+  pulseSpeed: 3.5
+  pulseMin: 0.35
+  pulseMax: 0.85
+--- !u!224 &1290795759
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1290795757}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2108405058}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 735.4655, y: 66.15121}
+  m_SizeDelta: {x: 1030.4456, y: 576.7036}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1316114752
 GameObject:
   m_ObjectHideFlags: 0
@@ -8252,6 +8327,11 @@ MonoBehaviour:
   showInlineDescriptionInInventory: 1
   artifact: {fileID: 0}
   mode: 0
+  dragEnabled: 0
+  swayPerVelocity: 1.4
+  swayMaxAngle: 22
+  swayLerpSpeed: 14
+  swayReturnSpeed: 90
 --- !u!114 &1316114755
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10826,6 +10906,11 @@ MonoBehaviour:
   showInlineDescriptionInInventory: 1
   artifact: {fileID: 0}
   mode: 0
+  dragEnabled: 0
+  swayPerVelocity: 2.5
+  swayMaxAngle: 40
+  swayLerpSpeed: 40
+  swayReturnSpeed: 100
 --- !u!1 &1651503578
 GameObject:
   m_ObjectHideFlags: 0
@@ -13478,6 +13563,7 @@ MonoBehaviour:
   closeButton: {fileID: 0}
   useButton: {fileID: 0}
   titleLabel: {fileID: 1987315543}
+  dropZone: {fileID: 0}
   currentIndex: 0
   tooltip: {fileID: 1030158163}
   gameManager: {fileID: 183698589}
@@ -14043,6 +14129,7 @@ RectTransform:
   - {fileID: 2048606372}
   - {fileID: 71725266}
   - {fileID: 1756962375}
+  - {fileID: 1290795759}
   m_Father: {fileID: 452006346}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -14071,6 +14158,7 @@ MonoBehaviour:
   closeButton: {fileID: 0}
   useButton: {fileID: 1754650657}
   titleLabel: {fileID: 181240874}
+  dropZone: {fileID: 1290795758}
   currentIndex: 0
   tooltip: {fileID: 1030158163}
   gameManager: {fileID: 183698589}

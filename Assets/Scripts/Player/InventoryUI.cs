@@ -15,6 +15,10 @@ public class InventoryUI : MonoBehaviour
     public Button useButton;
     public TMP_Text titleLabel;                     // "ArtifactTitle" — nom de l'artefact sélectionné
 
+    [Header("Drag & Drop")]
+    [Tooltip("Zone (table de jeu) sur laquelle glisser la carte pour activer l'artefact.")]
+    public ArtifactDropZone dropZone;
+
 
     [Header("State")]
     [SerializeField] private int currentIndex = 0;
@@ -53,7 +57,16 @@ public class InventoryUI : MonoBehaviour
             cardView.UpdateMode(ArtifactCardMode.Inventory);
             cardView.SetTooltip(tooltip);
             cardView.onClicked = _ => gameManager?.TryUseArtifactFromInventory(currentIndex);
+            // Drag & drop sur la table : active l'artefact courant (remplace le bouton USE)
+            cardView.EnableDrag(dropZone, OnCardDroppedOnTable);
         }
+    }
+
+    // Appelé quand la carte d'inventaire est déposée sur la zone table.
+    void OnCardDroppedOnTable()
+    {
+        if (inventory == null || inventory.Count == 0) return;
+        gameManager?.TryUseArtifactFromInventory(currentIndex);
     }
 
     void OnEnable()
