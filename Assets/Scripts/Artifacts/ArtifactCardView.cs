@@ -39,7 +39,9 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     // ==== Drag & drop (mode Inventaire) : glisser la carte sur la table pour activer l'artefact ====
     [HideInInspector] public bool dragEnabled = false;
     ArtifactDropZone dropZone;
-    System.Action onDroppedOnTable;
+    // Retourne true si l'artefact a réellement été joué (l'animation de destruction
+    // ne doit pas se jouer quand l'usage est refusé).
+    System.Func<bool> onDroppedOnTable;
     Camera dragCam;
 
     // Sauvegarde de la position d'origine (on déplace la carte elle-même, pas une copie)
@@ -58,7 +60,7 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     float swayTargetZ;
 
     // Active/désactive le drag pour cette carte (appelé par InventoryUI).
-    public void EnableDrag(ArtifactDropZone zone, System.Action onDropped)
+    public void EnableDrag(ArtifactDropZone zone, System.Func<bool> onDropped)
     {
         dropZone = zone;
         onDroppedOnTable = onDropped;
@@ -271,11 +273,13 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (cg) cg.blocksRaycasts = true;
         if (dropZone) dropZone.SetHighlight(false);
 
-        // Déposé sur la table → effet de destruction + activation de l'artefact.
+        // Déposé sur la table → on tente l'activation, et l'effet de destruction n'est joué
+        // QUE si l'artefact a réellement été consommé. Un usage refusé (mauvais moment,
+        // aucune cible valide, effet non implémenté…) laisse la carte intacte.
         if (droppedOnTable)
         {
-            SpawnDestructionFx(eventData.position);
-            onDroppedOnTable?.Invoke();
+            bool used = onDroppedOnTable != null && onDroppedOnTable.Invoke();
+            if (used) SpawnDestructionFx(eventData.position);
         }
     }
 

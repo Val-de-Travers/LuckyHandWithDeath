@@ -14,8 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: flash_scroll
   displayName: Parchemin de FLASH
-  description: "Cr\xE9e artificiellement un FLASH en choisissant un d\xE9, puis on
-    compl\xE8te le triple avec deux autres d\xE9s disponibles"
+  description: "Cr\xE9e artificiellement un FLASH en choisissant un d\xE9 \xE0 copier
+    sur deux autres d\xE9s disponibles"
   icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   rarity: 1
   type: 2
