@@ -22,6 +22,15 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     public bool isSunDie = false;   // uniquement pour le 5e dé (noir)
     public DiceSprites sprites;
 
+    [Header("Surlignage de sélection")]
+    [Tooltip("Couleur du contour quand le dé fait partie d'un FLASH (joueur ou adversaire). " +
+             "La couleur de sélection normale est celle réglée sur l'Image HoldOutline dans la scène.")]
+    public Color flashHighlightColor = new Color(1f, 0.55f, 0.05f); // orange
+
+    // Couleur de sélection « normale », capturée depuis la scène au démarrage.
+    Color baseHighlightColor = Color.white;
+    bool highlightIsFlash = false;
+
     [Header("Sun Die Visual")]
     [Tooltip("Si coché et isSunDie, affiche la face du dé en couleurs inversées (négatif).")]
     public bool invertSunDieColors = true;
@@ -68,7 +77,12 @@ public class DieView : MonoBehaviour, IPointerClickHandler
         selfImg.raycastTarget = true;
 
         if (lockIcon)      lockIcon.enabled = false;
-        if (holdHighlight) { holdHighlight.enabled = false; holdHighlight.raycastTarget = false; }
+        if (holdHighlight)
+        {
+            holdHighlight.enabled = false;
+            holdHighlight.raycastTarget = false;
+            baseHighlightColor = holdHighlight.color; // couleur de sélection réglée dans la scène
+        }
 
         ApplySunDieMaterial();
     }
@@ -101,6 +115,8 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     public void ResetForNewTurn()
     {
         isLocked = false;
+        highlightIsFlash = false;
+        ApplyHighlightColor();
         if (lockIcon)      lockIcon.enabled = false;
         if (holdHighlight) holdHighlight.enabled = false;
         SetFaceSprite(null); // efface l’affichage jusqu’au premier roll
@@ -140,6 +156,27 @@ public class DieView : MonoBehaviour, IPointerClickHandler
         isLocked = locked;
         if (lockIcon) lockIcon.enabled = locked;
         if (holdHighlight) holdHighlight.enabled = locked; // outline = miroir du lock
+    }
+
+    // Le dé fait-il partie d'un FLASH ? Le contour passe alors en orange, pour le
+    // distinguer d'une sélection normale. Piloté par GameManager (joueur ET adversaire).
+    public void SetFlashHighlight(bool isFlash)
+    {
+        if (highlightIsFlash == isFlash) return;
+        highlightIsFlash = isFlash;
+        ApplyHighlightColor();
+    }
+
+    void ApplyHighlightColor()
+    {
+        if (!holdHighlight) return;
+        if (highlightIsFlash)
+        {
+            var c = flashHighlightColor;
+            c.a = baseHighlightColor.a; // conserve l'opacité réglée dans la scène
+            holdHighlight.color = c;
+        }
+        else holdHighlight.color = baseHighlightColor;
     }
 
     void SetFaceSprite(DieFace? face)

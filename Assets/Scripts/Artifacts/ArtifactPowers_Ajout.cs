@@ -154,9 +154,10 @@ public class LoveFilterEffect : IArtifactEffect
 
         if (triple != null)
         {
-            // FLASH immédiat : lock + points + Clause (et +10 bonus Filtre)
+            // FLASH immédiat : lock + points + Clause. Le bonus du Filtre est désormais
+            // +30% sur la bank de ce tour (modificateur de score) au lieu du +10 fixe.
             gm.Artifacts_CreateFlashFromIndices(triple, weakest);
-            gm.Artifacts_AddTurnBonus(10, "Filtre d’amour : +10 bonus (flash créé).");
+            gm.Artifacts_ActivateLoveFilterBankBonus(1.3f);
 
             // Le dé d’ajout fait partie du flash (verrouillé) → on NE le retire pas maintenant.
             gm.Artifacts_RefreshUI();

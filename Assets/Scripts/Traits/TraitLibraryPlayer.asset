@@ -18,14 +18,14 @@ MonoBehaviour:
     traitName: "Imp\xF4ts bourgeois"
     description: "Si les 2 joueurs ont le m\xEAme score, le joueur adverse donne
       20% de son score actuel au joueur."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: player.resurrection
     traitName: "R\xE9surrection "
     description: "Si 3 d\xE9faites le joueur peut lancer le d\xE9 SUN, si il fait
       5-10 ou SUN il peut revenir dans la partie et rejouer la partie qu\u2019il
       vient de perdre"
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: 
     traitName: 'Couronne  '
     description: "Le propri\xE9taire est toujours le premier \xE0 jouer."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}

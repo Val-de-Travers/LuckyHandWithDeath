@@ -56,6 +56,9 @@ public class GameManager : MonoBehaviour
     private bool awaitingVictoryNext = false;
     // Nombre d'artefacts offerts à la prochaine phase d'obtention (3 en victoire, 1 en défaite)
     private int pendingArtifactPickCount = 3;
+    // Phases d'obtention SUPPLÉMENTAIRES à enchaîner après la phase courante.
+    // Récompense de fin de Palier 3 : 2 phases au total (voir OnPressNext).
+    private int extraArtifactPicks = 0;
 
     // ====== HintBanner fusion (priorité aux annonces HintBanner) ======
     enum BannerMode { None, State, Action }
@@ -238,6 +241,9 @@ public class GameManager : MonoBehaviour
     private readonly HashSet<int> frozenLocks = new();
     private readonly HashSet<int> mutableLocks = new();
     private readonly HashSet<int> flashLockIndices = new();
+    // VISUEL UNIQUEMENT : dés d'un Flash non suivis par flashLockIndices — Flash de l'IA
+    // et Flash créé par un artefact. Sert au surlignage orange, n'influence aucune règle.
+    private readonly HashSet<int> flashVisualIndices = new();
     private readonly Dictionary<int, int> mutablePoints = new();
     private readonly HashSet<int> eligibleLockIndices = new();
     private readonly Dictionary<int, int> eligibleLockPoints = new();
@@ -247,6 +253,10 @@ public class GameManager : MonoBehaviour
     // si le joueur désélectionne tout, la Clause doit se réarmer.
     private bool clauseClearedBySelection = false;
 
+    // Wimpout du joueur alors qu'il possède encore un artefact de sauvetage : la vérification
+    // de fin de match est REPORTÉE au CONTINUE, sinon un tour décisif (phase finale) se
+    // solderait par une défaite immédiate sans laisser jouer l'artefact.
+    private bool pendingWinCheckOnContinue = false;
     // Score du tour perdu au dernier wimpout du joueur — restauré si un artefact
     // de relance (Os du Tricheur) offre une seconde chance sur ce jet.
     private int wimpoutLostTurnScore = 0;
@@ -285,6 +295,10 @@ public class GameManager : MonoBehaviour
     public float counterPlayTimeout = 3f;
     [Tooltip("Barre de temps (Image en mode Filled) qui se vide pendant la fenêtre de contre-jeu.")]
     public Image counterPlayTimerBar;
+    [Tooltip("Coché : aucune fenêtre de contre-jeu n'est proposée (ni pause, ni barre de temps). " +
+             "Le tour de l'adversaire se déroule normalement, comme si le joueur n'avait pas d'artefact " +
+             "de Contre-Jeu. L'état reste tel quel jusqu'à ce que le joueur décoche la case.")]
+    public Toggle disableCounterPlayToggle;
 
     // ===== Tirage au sort du premier joueur =====
     private bool openingRollOffBusy = false; // anti double-clic pendant l'animation du tirage
@@ -375,41 +389,55 @@ public class GameManager : MonoBehaviour
     public PlayerInventory aiInventory;
 
     // Met à jour l'inventaire visible de l'adversaire (artefact possédé ce match).
+    // Un artefact CONSOMMÉ disparaît complètement (icône cachée, label vidé).
     void RefreshAIArtifactUI()
     {
-        bool has = aiArtifact != null;
-
         // Synchronise l'inventaire IA : l'artefact consommé disparaît de la liste
         if (aiInventory && aiArtifactUsed && aiInventory.Count > 0)
             aiInventory.ClearAll();
 
+        bool show = aiArtifact != null && !aiArtifactUsed;
+
         if (aiArtifactIcon)
         {
-            aiArtifactIcon.gameObject.SetActive(has && aiArtifact.icon != null);
-            if (has && aiArtifact.icon != null)
+            aiArtifactIcon.gameObject.SetActive(show && aiArtifact.icon != null);
+            if (show && aiArtifact.icon != null)
             {
                 aiArtifactIcon.sprite = aiArtifact.icon;
                 aiArtifactIcon.preserveAspect = true;
-                aiArtifactIcon.color = aiArtifactUsed ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
+                aiArtifactIcon.color = Color.white;
             }
         }
 
         if (aiArtifactLabel)
-        {
-            if (!has) aiArtifactLabel.text = "";
-            else aiArtifactLabel.text = aiArtifactUsed ? $"<s>{aiArtifact.displayName}</s>" : aiArtifact.displayName;
-        }
+            aiArtifactLabel.text = show ? aiArtifact.displayName : "";
     }
 
     // Reconstruit les vignettes de traits (icône + tooltip) dans les AddBox des deux joueurs.
     // À appeler quand la composition change (nouveau match, trait acquis/perdu, replay).
     void RebuildTraitIcons()
     {
-        RebuildTraitIconsInto(playerTraitsIconsRoot, playerTraits);
-        RebuildTraitIconsInto(aiTraitsIconsRoot, activeEnemyTraitInfos);
+        RebuildTraitIconsInto(playerTraitsIconsRoot, playerTraits, isPlayerSide: true);
+        RebuildTraitIconsInto(aiTraitsIconsRoot, activeEnemyTraitInfos, isPlayerSide: false);
     }
 
-    void RebuildTraitIconsInto(RectTransform root, List<TraitDef> traits)
+    // Un trait à effet UNIQUE (1×/match) a-t-il déjà été consommé ?
+    // Le Verre Empoisonné existe des deux côtés : le drapeau dépend du porteur.
+    bool IsTraitConsumed(string key, bool isPlayerSide)
+    {
+        switch (NormalizeTraitKey(key))
+        {
+            case "poisonglass":   return isPlayerSide ? traitPoisonGlassUsedVsAI : traitPoisonGlassUsedVsPlayer;
+            // Côté joueur : 1×/match. Côté ennemi (Chevalière) : 1×/Clause, jamais « épuisé ».
+            case "estoc":         return isPlayerSide && estocUsedThisMatchPlayer;
+            case "boss.blacksun": return traitBlackSunUsed;
+            case "boss.audit":    return traitAuditUsed;
+            case "boss.tide":     return traitTideUsed;
+            default:              return false; // traits permanents ou à usage non limité
+        }
+    }
+
+    void RebuildTraitIconsInto(RectTransform root, List<TraitDef> traits, bool isPlayerSide)
     {
         if (!root) return;
 
@@ -460,7 +488,7 @@ public class GameManager : MonoBehaviour
             le.preferredWidth = traitIconSize.x;
             le.preferredHeight = traitIconSize.y;
 
-            view.Setup(sprite, t.name, t.desc, tooltip);
+            view.Setup(sprite, t.name, t.desc, tooltip, IsTraitConsumed(t.key, isPlayerSide));
         }
     }
 
@@ -502,7 +530,7 @@ public class GameManager : MonoBehaviour
     private bool playerHasRolledThisMatch = false;     // Pistage (joueur)
     private int  aiTurnsThisMatch = 0;                 // Runes magiques (IA)
     private int  playerTurnsThisMatch = 0;             // Runes magiques (joueur)
-    private bool estocUsedThisTurnPlayer = false;      // Coup d'estoc (joueur, 1×/tour)
+    private bool estocUsedThisMatchPlayer = false;     // Coup d'estoc (joueur, 1×/match — réarmé au prochain adversaire)
     // État campagne
     private bool resurrectionUsed = false;             // Résurrection (1×/campagne)
 
@@ -544,6 +572,7 @@ public class GameManager : MonoBehaviour
     {
         if (!EnemyTraitActive("boss.audit") || traitAuditUsed) return false;
         traitAuditUsed = true;
+        RebuildTraitIcons(); // marque le trait « (utilisé) » dans l'AddBox
         hintBanner?.Show("Audit des Morts : le Boss annule votre artefact et le confisque !");
         uiLog?.Append("Trait Boss Audit des Morts : artefact annulé et retiré.");
         return true;
@@ -788,6 +817,9 @@ public class GameManager : MonoBehaviour
         // nettoyer tout résidu d’une éventuelle sélection d’artefact
         CancelArtifactPickUI();
 
+        // Aucune phase d'obtention bonus ne survit d'un match à l'autre
+        extraArtifactPicks = 0;
+
         // Aucun artefact "armé" (ciblage, face forcée, bonus en attente) ne survit d'un match à l'autre
         CancelExternalDiePick();
         ClearExternalDiePick();
@@ -821,6 +853,7 @@ public class GameManager : MonoBehaviour
         frozenLocks.Clear();
         mutableLocks.Clear();
         flashLockIndices.Clear();
+        flashVisualIndices.Clear();
         mutablePoints.Clear();
         eligibleLockIndices.Clear();
         eligibleLockPoints.Clear();
@@ -828,6 +861,7 @@ public class GameManager : MonoBehaviour
         flashPendingResolution = false;
         clauseClearedBySelection = false;
         wimpoutLostTurnScore = 0;
+        pendingWinCheckOnContinue = false;
 
         // Tirage au sort : chaque joueur lance un dé, le plus fort commence (égalité → relance)
         // Seuls le dé 1 (joueur) et le dé SUN (adversaire) sont visibles/utilisés.
@@ -874,7 +908,7 @@ public class GameManager : MonoBehaviour
         playerHasRolledThisMatch = false;
         aiTurnsThisMatch = 0;
         playerTurnsThisMatch = 0;
-        estocUsedThisTurnPlayer = false;
+        estocUsedThisMatchPlayer = false;
 
         int lastPalier = GetPalierCount() - 1;
         bool traitActive =
@@ -953,6 +987,7 @@ public class GameManager : MonoBehaviour
             aiInventory.ClearAll();
             if (aiArtifact != null) aiInventory.TryAdd(aiArtifact);
         }
+        RefreshAIArtifactUI(); // visible dès la phase de tirage d'ordre
         uiLog?.Append(activeEnemyTraitKeys.Count == 0
             ? "Traits actifs de l'adversaire : aucun."
             : $"Traits actifs de l'adversaire : {string.Join(", ", activeEnemyTraitKeys)}.");
@@ -1067,13 +1102,8 @@ public class GameManager : MonoBehaviour
             palierIndex++;
             enemyIndex = 0;
 
-            // Passage de palier : le joueur se dégage d'une défaite (s'il en a).
-            if (defeatsCount > 0)
-            {
-                defeatsCount--;
-                hintBanner?.Show($"Nouveau palier : une défaite vous est retirée ({defeatsCount}/3).");
-                uiLog?.Append($"Passage de palier — une défaite effacée ({defeatsCount}/3).");
-            }
+            // (Plus d'effacement automatique de défaite au passage de palier :
+            //  le joueur peut à la place DÉTRUIRE un artefact pour retirer une défaite.)
 
             // (Plus d'octroi automatique de trait en fin de palier : le joueur choisit
             //  uniquement via les phases de sélection dédiées.)
@@ -1134,12 +1164,15 @@ public class GameManager : MonoBehaviour
         foreach (var d in dice) if (d != null && d.isSunDie) { sunDie = d; break; }
         if (sunDie == null && dice.Count > 0) sunDie = dice[0];
 
+        // Mise en scène : SEUL le dé SUN est visible pendant le lancé du destin.
+        foreach (var d in dice)
+            if (d != null) d.gameObject.SetActive(d == sunDie);
+
         hintBanner?.Show("Résurrection : lancez votre destin — le dé SUN décide...");
         yield return new WaitForSeconds(0.8f);
 
         if (sunDie != null)
         {
-            sunDie.gameObject.SetActive(true);
             sunDie.Roll();
             sunDie.Pulse(0.3f, 1.2f);
         }
@@ -1229,7 +1262,8 @@ public class GameManager : MonoBehaviour
         else
         {
             playerTurnsThisMatch++;       // compteur pour Runes magiques (joueur)
-            estocUsedThisTurnPlayer = false;
+            // (Coup d'estoc : plus de réarmement par tour — 1×/match, remis à zéro
+            //  uniquement au match suivant, avec les autres drapeaux de traits.)
         }
 
         // Reset des états de Contre-Jeu à chaque changement de tour
@@ -1243,10 +1277,12 @@ public class GameManager : MonoBehaviour
         flashPendingResolution = false;
         clauseClearedBySelection = false;
         wimpoutLostTurnScore = 0;
+        pendingWinCheckOnContinue = false;
 
         frozenLocks.Clear();
         mutableLocks.Clear();
         flashLockIndices.Clear();
+        flashVisualIndices.Clear();
         mutablePoints.Clear();
         eligibleLockIndices.Clear();
         eligibleLockPoints.Clear();
@@ -1305,7 +1341,7 @@ public class GameManager : MonoBehaviour
             bool rescuePending = wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact();
             bool hasUsableNow = PlayerHasNonCounterArtifact();
             if (hasUsableNow && !rescuePending)
-                ShowAction("Souhaitez-vous utiliser un Artefact ? Ouvrez l’inventaire et appuyez sur USE — sinon CONTINUE.");
+                ShowAction("Souhaitez-vous utiliser un Artefact ? Glissez-le de l’inventaire sur la table — sinon CONTINUE.");
         }
 
         // Quand l’IA commence à jouer, on efface l’annonce en cours (fade-out configurable)
@@ -1325,8 +1361,22 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
+    // Applique le surlignage orange aux dés faisant partie d'un Flash (joueur ou adversaire),
+    // bleu (couleur de scène) pour une sélection normale. Appelé depuis UpdateUI : couvre
+    // ainsi tous les chemins (jet, Clause, artefacts, IA) sans toucher aux sites de verrouillage.
+    void RefreshDiceFlashHighlights()
+    {
+        if (dice == null) return;
+        for (int i = 0; i < dice.Count; i++)
+        {
+            if (dice[i] == null) continue;
+            dice[i].SetFlashHighlight(flashLockIndices.Contains(i) || flashVisualIndices.Contains(i));
+        }
+    }
+
     void UpdateUI()
     {
+        RefreshDiceFlashHighlights();
         WIN_THRESHOLD = GetWinThresholdForPalier(palierIndex);
 
         // Scores visibles : uniquement "score / objectif pts" (pas de nom).
@@ -1583,7 +1633,18 @@ public class GameManager : MonoBehaviour
         if (gameOver || matchOver || isGameOverScreen) return;
         if (currentTurn != Turn.Player) return;
         if (phase != Phase.Normal && phase != Phase.Clause) return;
-        if (flashPendingResolution && phase == Phase.Normal) return;
+
+        // Filet de sécurité : un Flash « en attente » en phase Normale est un état incohérent
+        // (la résolution d'un Flash se fait en phase Clause). Le laisser passer bloquait la
+        // partie — les clics étaient ignorés sans message et ROLL/BANK restaient grisés.
+        // On répare l'état au lieu de figer le jeu.
+        if (flashPendingResolution && phase == Phase.Normal)
+        {
+            ClearClauseState();
+            clauseClearedBySelection = false;
+            uiLog?.Append("État incohérent corrigé : Flash en attente hors Clause.");
+            ApplyButtonsState();
+        }
 
         int idx = dice.IndexOf(die);
         if (idx < 0) return;
@@ -1841,6 +1902,7 @@ public class GameManager : MonoBehaviour
         if (EnemyTraitActive("poisonglass") && !traitPoisonGlassUsedVsPlayer && playerScore > 100)
         {
             traitPoisonGlassUsedVsPlayer = true;
+            RebuildTraitIcons();
             int before = playerScore;
             playerScore = Mathf.RoundToInt(playerScore / 2f);
             ShowAction($"Verre Empoisonné : votre score est divisé par 2 ({before} → {playerScore}) !");
@@ -1941,6 +2003,17 @@ public class GameManager : MonoBehaviour
 
             bool lastOfPalier = enemyIndex >= GetEnemyCountInPalier(palierIndex) - 1;
             bool palier2or4 = (palierIndex == 1 || palierIndex == 3);
+
+            // Récompense de fin de Palier 3 (palierIndex == 2) : DEUX phases d'obtention
+            // au lieu d'une. Uniquement sur une victoire — une défaite garde sa phase
+            // de consolation unique.
+            if (lastOfPalier && palierIndex == 2 && lastMatchWinner == PLAYER_NAME)
+            {
+                extraArtifactPicks = 1;
+                hintBanner?.Show("Palier 3 franchi : deux phases d'obtention d'artefact !");
+                uiLog?.Append("Récompense de Palier 3 — 2 phases d'obtention.");
+            }
+
             if (lastOfPalier && palier2or4)
             {
                 var options = new List<TraitDef>();
@@ -1971,6 +2044,14 @@ public class GameManager : MonoBehaviour
 
         if (!canEnd) return;
 
+        // Wimpout avec sauvetage possible : la fin de match a été différée jusqu'ici.
+        // Le joueur a eu sa fenêtre pour jouer un artefact ; on tranche maintenant.
+        if (pendingWinCheckOnContinue)
+        {
+            CheckWinConditionOnTurnEnded(); // remet aussi le drapeau à false
+            if (gameOver || matchOver || isGameOverScreen) { ApplyButtonsState(); return; }
+        }
+
         var next = (currentTurn == Turn.Player) ? Turn.AI : Turn.Player;
         ClearScoreModifier();
         StartNewTurn(next);
@@ -2000,6 +2081,7 @@ public class GameManager : MonoBehaviour
             foreach (var d in dice) if (d != null) d.SetLocked(false);
             frozenLocks.Clear();
             flashLockIndices.Clear();
+            flashVisualIndices.Clear();
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
 
@@ -2036,6 +2118,7 @@ public class GameManager : MonoBehaviour
         if (isReroll && !traitTideUsed && EnemyTraitActive("boss.tide"))
         {
             traitTideUsed = true;
+            RebuildTraitIcons();
             int best = lastRolledIndices.Max(i => HighValueOf(dice[i].GetFace()));
             aiScore += best;
             ShowAction($"Marée du Destin : votre relance est engloutie — le Boss gagne {best} pts !");
@@ -2090,6 +2173,7 @@ public class GameManager : MonoBehaviour
             if (EnemyTraitActive("boss.blacksun") && !traitBlackSunUsed && remaining.Count > 0)
             {
                 traitBlackSunUsed = true;
+                RebuildTraitIcons();
                 int lowest = remaining[0];
                 foreach (var i in remaining)
                     if (HighValueOf(dice[i].GetFace()) < HighValueOf(dice[lowest].GetFace())) lowest = i;
@@ -2139,13 +2223,25 @@ public class GameManager : MonoBehaviour
                 wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
                 turnScore = 0;
                 UpdateUI();
-                if (wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact())
-                    ShowAction($"Wimpout ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts avec un artefact (USE) — sinon CONTINUE.");
+
+                // Un artefact de Transformation/Relance peut encore renverser ce jet.
+                bool canStillRescue = PlayerHasRescueArtifact();
+                if (canStillRescue)
+                    ShowAction(wimpoutLostTurnScore > 0
+                        ? $"Wimpout ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts : glissez un artefact sur la table — sinon CONTINUE."
+                        : "Wimpout ! Un artefact peut encore sauver ce jet : glissez-le sur la table — sinon CONTINUE.");
                 else
                     ShowAction("Wimpout ! Aucun point sur ce jet.");
                 uiLog?.Append("Wimpout (aucun 5/10/SUN=10 et pas de Flash).");
 
-                CheckWinConditionOnTurnEnded();
+                // Tant qu'un sauvetage reste possible, on ne clôt PAS le match : en phase finale
+                // la vérification déclencherait une défaite avant que l'artefact soit joué.
+                if (canStillRescue)
+                {
+                    pendingWinCheckOnContinue = true;
+                    uiLog?.Append("Fin de match différée : un artefact de sauvetage est disponible.");
+                }
+                else CheckWinConditionOnTurnEnded();
 
                 yield return new WaitForSeconds(0.25f);
                 SetPhase(Phase.WaitEnd);
@@ -2166,6 +2262,7 @@ public class GameManager : MonoBehaviour
             foreach (var d in dice) if (d != null) d.SetLocked(false);
             frozenLocks.Clear();
             flashLockIndices.Clear();
+            flashVisualIndices.Clear();
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
 
@@ -2209,28 +2306,56 @@ public class GameManager : MonoBehaviour
         if (eligibleLockIndices.Count > 0)
         { ShowAction("Tu peux sélectionner un 5/10/SUN pour prendre les points et dégager le Flash, ou ROLL pour continuer la Clause."); SetPhase(Phase.Clause); yield break; }
 
-        bool matchedFlashFace = lastRolledIndices.Any(idx => MapFlashableFace(dice[idx].GetFace()) == currentFlashFace);
+        // La face du Flash retombe ? On vérifie TOUS les dés libres (pas seulement le dernier jet),
+        // pour ne jamais rater un dé qui autorise la poursuite de la Clause.
+        var freeDice = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null && !dice[i].isLocked).ToList();
+        bool matchedFlashFace = freeDice.Any(idx => MapFlashableFace(dice[idx].GetFace()) == currentFlashFace);
+        uiLog?.Append($"Clause {(int)currentFlashFace} : faces libres = {string.Join(",", freeDice.Select(i => (int)dice[i].GetFace()))} → retombe: {matchedFlashFace}.");
         if (matchedFlashFace)
         { ShowAction($"Clause : {(int)currentFlashFace} retombe — appuie sur ROLL pour continuer."); SetPhase(Phase.Clause); yield break; }
 
-        // ---- TRAIT Coup d'estoc (joueur) : la Clause perdue offre une relance exceptionnelle ----
-        if (PlayerHasTrait("estoc") && !estocUsedThisTurnPlayer)
+        // ---- TRAIT Coup d'estoc (joueur) : la Clause perdue offre une relance exceptionnelle
+        //      (1×/match — le trait se réarme au prochain adversaire) ----
+        if (PlayerHasTrait("estoc") && !estocUsedThisMatchPlayer)
         {
-            estocUsedThisTurnPlayer = true;
+            estocUsedThisMatchPlayer = true;
+            RebuildTraitIcons(); // marque le trait « (utilisé) » dans l'AddBox
             ShowAction("Coup d'estoc : le dé perdant vous accorde une relance — appuie sur ROLL !");
             uiLog?.Append("Trait Coup d'estoc (joueur) : relance exceptionnelle de la Clause.");
             SetPhase(Phase.Clause);
             yield break;
         }
+        else if (!PlayerHasTrait("estoc"))
+        {
+            // Diagnostic : si le joueur pense posséder Coup d'estoc, la clé stockée diffère peut-être.
+            uiLog?.Append($"Clause perdue — pas de Coup d'estoc (traits joueur : {(playerTraits.Count == 0 ? "aucun" : string.Join(", ", playerTraits.Select(t => t.key)))}).");
+        }
 
         wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
         turnScore = 0;
         UpdateUI();
-        if (wimpoutLostTurnScore > 0 && PlayerHasRescueArtifact())
-            ShowAction($"Wimpout pendant Clause ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts avec un artefact (USE) — sinon CONTINUE.");
+
+        // La Clause est perdue : le Flash n'est plus « en attente de résolution ».
+        // Sans ce nettoyage, flashPendingResolution restait vrai en phase WaitEnd et un
+        // artefact de relance ramenait le jeu en phase Normal avec un Flash fantôme —
+        // les dés devenaient alors silencieusement incliquables (jeu bloqué).
+        ClearClauseState();
+
+        bool canRescueClause = PlayerHasRescueArtifact();
+        if (canRescueClause)
+            ShowAction(wimpoutLostTurnScore > 0
+                ? $"Wimpout pendant Clause ! Vous pouvez encore sauver vos {wimpoutLostTurnScore} pts : glissez un artefact sur la table — sinon CONTINUE."
+                : "Wimpout pendant Clause ! Un artefact peut encore sauver ce jet : glissez-le sur la table — sinon CONTINUE.");
         else
             ShowAction("Wimpout pendant Clause.");
-        CheckWinConditionOnTurnEnded();
+
+        // Même report qu'au wimpout normal : pas de clôture tant qu'un sauvetage est possible.
+        if (canRescueClause)
+        {
+            pendingWinCheckOnContinue = true;
+            uiLog?.Append("Fin de match différée : un artefact de sauvetage est disponible (Clause).");
+        }
+        else CheckWinConditionOnTurnEnded();
         yield return new WaitForSeconds(0.25f);
         SetPhase(Phase.WaitEnd);
     }
@@ -2252,15 +2377,18 @@ public class GameManager : MonoBehaviour
         return false;
     }
 
-    // Le joueur possède-t-il un artefact capable de SAUVER un tour perdu
-    // (Transformation ou Relance : Fortifiant, Balance, Miroir, Os du Tricheur, Temps...) ?
+    // Le joueur possède-t-il un artefact capable de SAUVER un tour perdu ?
+    // Transformation (Fortifiant, Balance, Miroir), Relance (Os du Tricheur, Temps)
+    // et Ajout (un dé supplémentaire peut créer un marquant ou un Flash).
     public bool PlayerHasRescueArtifact()
     {
         if (playerInventory == null) return false;
         for (int i = 0; i < playerInventory.Count; i++)
         {
             var a = playerInventory.GetAt(i);
-            if (a != null && (a.type == ArtifactType.Transformation || a.type == ArtifactType.Relance))
+            if (a != null && (a.type == ArtifactType.Transformation
+                           || a.type == ArtifactType.Relance
+                           || a.type == ArtifactType.Ajout))
                 return true;
         }
         return false;
@@ -2286,8 +2414,16 @@ public class GameManager : MonoBehaviour
         if (currentTurn != Turn.AI) yield break;       // jamais pendant le tour du joueur
         if (!PlayerHasCounterArtifact()) yield break; // rien à proposer → l'IA enchaîne
 
+        // Le joueur a désactivé le Contre-Jeu : aucune pause, aucune barre de temps.
+        // Le tour de l'IA se déroule comme s'il n'avait pas d'artefact de Contre-Jeu.
+        if (disableCounterPlayToggle && disableCounterPlayToggle.isOn)
+        {
+            if (counterPlayTimerBar) counterPlayTimerBar.gameObject.SetActive(false);
+            yield break;
+        }
+
         awaitingCounterPlay = true;
-        ShowAction("Contre-Jeu : ouvrez l'inventaire et USE pour jouer votre artefact, ou appuyez sur Next pour laisser l'IA jouer.");
+        ShowAction("Contre-Jeu : glissez votre artefact sur la table pour le jouer, ou appuyez sur Next pour laisser l'IA jouer.");
         if (endRoundButton) endRoundButton.interactable = true;
 
         // Timer : barre qui se vide en counterPlayTimeout secondes → auto-Next à zéro.
@@ -2341,9 +2477,15 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // Après un contre-jeu, l'IA re-sélectionne (verrouille) les dés marquants restés libres,
-    // un par un, sans les relancer. Aucun Flash n'est accordé ici : un contre-jeu ne doit
-    // jamais offrir un Flash à l'IA.
+    // Après un contre-jeu, l'IA re-sélectionne (verrouille) ce qui est marquant parmi ses dés
+    // restés libres, un par un, SANS les relancer — le résultat du contre-jeu est définitif.
+    //
+    // Un Flash formable parmi ces dés libres est reverrouillé en priorité : sans cela, un trio
+    // désélectionné par un contre-jeu (ex : trois 6, qui ne valent rien à l'unité) resterait
+    // libre et l'IA le relancerait au lieu de reformer son Flash.
+    // ⚠️ Le Flash est reformé dès qu'il est possible, même si le trio résulte du contre-jeu
+    // lui-même : un contre-jeu peut donc offrir un Flash à l'IA (choix de design assumé).
+    // Aucune Clause n'est accordée ici — le Flash reformé rapporte ses points, sans continuation.
     IEnumerator AIReselectScoringDice()
     {
         if (dice == null) yield break;
@@ -2352,6 +2494,54 @@ public class GameManager : MonoBehaviour
             .Where(i => dice[i] != null && !dice[i].isLocked).ToList();
         if (unlocked.Count == 0) yield break;
 
+        // ---- 1) Flash formable parmi les dés libres (3 identiques, ou paire + Sun) ----
+        var byFace = new Dictionary<DieFace, List<int>>();
+        var suns = new List<int>();
+        foreach (var i in unlocked)
+        {
+            var f = dice[i].GetFace();
+            if (f == DieFace.Sun) suns.Add(i);
+            else { if (!byFace.ContainsKey(f)) byFace[f] = new List<int>(); byFace[f].Add(i); }
+        }
+
+        var flashIdx = new List<int>();
+        DieFace flashFace = DieFace.Two;
+        var faceOrder = new List<DieFace> { DieFace.Ten, DieFace.Six, DieFace.Five, DieFace.Four, DieFace.Three, DieFace.Two };
+        foreach (var face in faceOrder)
+        {
+            int n = byFace.ContainsKey(face) ? byFace[face].Count : 0;
+            if (n >= 3)
+            {
+                flashFace = face;
+                for (int k = 0; k < 3; k++) flashIdx.Add(byFace[face][k]);
+                break;
+            }
+            if (n == 2 && suns.Count > 0)
+            {
+                flashFace = face;
+                flashIdx.Add(byFace[face][0]);
+                flashIdx.Add(byFace[face][1]);
+                flashIdx.Add(suns[0]);
+                break;
+            }
+        }
+
+        if (flashIdx.Count == 3)
+        {
+            foreach (var i in flashIdx) flashVisualIndices.Add(i); // surlignage orange
+
+            yield return StartCoroutine(AILockDiceOneByOne(
+                flashIdx, pointsFor: null, lumpSumAfter: FLASH_SCORE[flashFace]));
+
+            hintBanner?.Show($"L'adversaire reforme son Flash de {(int)flashFace} (+{FLASH_SCORE[flashFace]}).");
+            uiLog?.Append($"IA : Flash de {(int)flashFace} reformé (+{FLASH_SCORE[flashFace]}).");
+
+            // Les dés du Flash ne sont plus libres pour l'étape des singles.
+            unlocked = unlocked.Where(i => !flashIdx.Contains(i)).ToList();
+            if (unlocked.Count == 0) yield break;
+        }
+
+        // ---- 2) Singles marquants (5 / 10 / Sun) sur ce qui reste libre ----
         var counts = new Dictionary<DieFace, int>();
         foreach (var i in unlocked)
         {
@@ -2706,6 +2896,7 @@ public class GameManager : MonoBehaviour
                 if (PlayerHasTrait("poisonglass") && !traitPoisonGlassUsedVsAI && aiScore > 100)
                 {
                     traitPoisonGlassUsedVsAI = true;
+                    RebuildTraitIcons();
                     int before = aiScore;
                     aiScore = Mathf.RoundToInt(aiScore / 2f);
                     ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");
@@ -2738,6 +2929,7 @@ public class GameManager : MonoBehaviour
         flashPendingResolution = false;
         currentFlashFace = DieFace.Two;
         flashLockIndices.Clear();
+        flashVisualIndices.Clear(); // le Flash n'existe plus : retour au surlignage normal
     }
 
     // Verrouille une série de dés de l'IA UN PAR UN, avec un petit délai + pulse,
@@ -2843,6 +3035,9 @@ public class GameManager : MonoBehaviour
         if (evalFlashOnly.createdFlash)
         {
             currentFlashFace = evalFlashOnly.flashFace;
+
+            // Surlignage orange du trio (visuel uniquement)
+            foreach (var i in evalFlashOnly.flashLockIndices) flashVisualIndices.Add(i);
 
             // Verrouille le trio du Flash un par un, puis crédite les points du Flash
             yield return StartCoroutine(AILockDiceOneByOne(
@@ -3120,6 +3315,10 @@ public class GameManager : MonoBehaviour
     // ===================== FIN DE MATCH & CONDITIONS =====================
     void CheckWinConditionOnTurnEnded()
     {
+        // La vérification a lieu : un éventuel report devient caduc (évite un double passage,
+        // qui en phase finale clôturerait le match à tort après une bank réussie).
+        pendingWinCheckOnContinue = false;
+
         if (gameOver || matchOver || isGameOverScreen) return;
 
         int palierWin = GetWinThresholdForPalier(palierIndex);
@@ -3698,56 +3897,24 @@ public class GameManager : MonoBehaviour
         ExitArtifactPickAndAdvance();
     }
 
-    public void OnPressUseCurrentArtifact()
-    {
-        if (awaitingArtifactPick) { ShowAction("Termine d’abord la sélection d’artefact."); return; }
-        if (playerInventory == null || inventoryUI == null) return;
-
-        var art = playerInventory.GetAt(inventoryUI.CurrentIndex);
-        if (art == null) { ShowAction("Aucun artefact sélectionné."); return; }
-
-        // 🔁 Route tout vers le système central si présent (gère Relance, Score, etc.)
-        if (artifactPowers != null)
-        {
-            artifactPowers.TryUseFromInventory(inventoryUI.CurrentIndex);
-            return;
-        }
-
-        // ---- Ancienne voie 'maison' : ne couvrait que Relance (on la garde en secours) ----
-        if (!IsPostRollWindow())
-        { ShowAction("Artefact de Relance utilisable après un jet uniquement."); return; }
-
-        if (art.type == ArtifactType.Relance)
-        {
-            if (!HasAnyPickableDieForRelance())
-            { ShowAction("Aucun dé disponible à relancer."); return; }
-
-            BeginExternalDiePick(
-                IsDiePickableForRelance,
-                pickedIndex =>
-                {
-                    ApplyRelance_RerollOne(pickedIndex);
-                    playerInventory.RemoveAt(inventoryUI.CurrentIndex);
-                    inventoryUI.RefreshNow();
-                    inventoryDots?.Refresh();
-                    uiLog?.Append($"Artefact utilisé : {art.displayName} (relance du dé {pickedIndex + 1}).");
-                },
-                "Choisis un dé à relancer."
-            );
-            return;
-        }
-
-        ShowAction("Cet artefact n’a pas encore d’effet implémenté.");
-    }
-
-
-
+    // (Le bouton USE a été retiré : l'activation d'un artefact passe uniquement
+    //  par le drag & drop de la carte d'inventaire sur la table — voir InventoryUI/ArtifactDropZone.)
 
 
     void ExitArtifactPickAndAdvance()
     {
         // Nettoyer UI / états de sélection
         CancelArtifactPickUI();
+
+        // Récompense de Palier : une phase d'obtention supplémentaire reste à jouer.
+        // (Vaut aussi après un SKIP : la phase offerte est consommée dans tous les cas.)
+        if (extraArtifactPicks > 0)
+        {
+            extraArtifactPicks--;
+            uiLog?.Append("Phase d'obtention supplémentaire (récompense de palier).");
+            EnterArtifactPick(pendingArtifactPickCount);
+            return;
+        }
 
         // Avancer immédiatement (matchOver déjà true)
         AdvanceToNextOpponentOrPalier();
@@ -3877,8 +4044,19 @@ public class GameManager : MonoBehaviour
             inventoryDots?.Refresh();
             inventoryUI.RefreshNow();
 
-            hintBanner?.Show("Artefact détruit. Vous pouvez maintenant choisir un artefact.");
-            uiLog?.Append("Artefact détruit pendant la phase d’obtention.");
+            // Sacrifice : détruire un artefact retire UNE défaite (s'il y en a).
+            if (defeatsCount > 0)
+            {
+                defeatsCount--;
+                hintBanner?.Show($"Artefact sacrifié : une défaite vous est retirée ({defeatsCount}/3) !");
+                uiLog?.Append($"Artefact détruit — une défaite effacée ({defeatsCount}/3).");
+                RefreshCampaignUI();
+            }
+            else
+            {
+                hintBanner?.Show("Artefact détruit. Vous pouvez maintenant choisir un artefact.");
+                uiLog?.Append("Artefact détruit pendant la phase d’obtention (aucune défaite à retirer).");
+            }
 
             // ⇩ grise/dégrise Destroy selon l’état actuel (ouvert/vide)
             RefreshArtifactPickActionButtons();
@@ -4076,6 +4254,12 @@ public class GameManager : MonoBehaviour
                 yield break;
             }
 
+            // Aucun Flash créé par la relance : on ne doit surtout pas entrer en phase
+            // Normale avec un Flash resté « en attente » (état hérité d'une Clause perdue),
+            // sinon OnDieClicked ignore silencieusement tous les clics et le jeu se bloque.
+            ClearClauseState();
+            clauseClearedBySelection = false;
+
             FillEligibleFromIndices(unlocked);
             if (eligibleLockIndices.Count > 0)
             {
@@ -4114,6 +4298,7 @@ public class GameManager : MonoBehaviour
         mutableLocks.Clear();
         mutablePoints.Clear();
         flashLockIndices.Clear();
+        flashVisualIndices.Clear();
         eligibleLockIndices.Clear();
         eligibleLockPoints.Clear();
         clauseClearedBySelection = false;
@@ -4183,17 +4368,16 @@ public class GameManager : MonoBehaviour
         ApplyButtonsState();
     }
 
-    public void TryUseArtifactFromInventory(int inventoryIndex)
+    // Retourne true si l'artefact a réellement été joué (usage accepté).
+    public bool TryUseArtifactFromInventory(int inventoryIndex)
     {
         // Si tu as intégré le système ArtifactPowers (étape précédente) :
         if (artifactPowers != null)
-        {
-            artifactPowers.TryUseFromInventory(inventoryIndex);
-            return;
-        }
+            return artifactPowers.TryUseFromInventory(inventoryIndex);
 
         // Sinon, message de secours (à retirer quand ArtifactPowers est branché).
         hintBanner?.Show("Aucun système de pouvoirs n'est configuré pour 'Use'.");
+        return false;
     }
 
     // ✅ Fenêtre d'usage pour "relancer son coup"
@@ -4250,10 +4434,17 @@ public class GameManager : MonoBehaviour
     {
         if (tripleIndices == null || tripleIndices.Count != 3) return;
 
+        // Si le tour venait d'être perdu (wimpout), le flash créé par l'artefact SAUVE le tour :
+        // on restaure d'abord le score perdu, puis on ajoute les points du flash.
+        if (phase == Phase.WaitEnd) RestoreWimpoutScoreIfAny();
+
         // 1) lock des 3 dés + points du FLASH
         foreach (var i in tripleIndices)
             if (i >= 0 && i < dice.Count && dice[i] != null)
+            {
                 dice[i].SetLocked(true);
+                flashVisualIndices.Add(i); // surlignage orange
+            }
 
         if (FLASH_SCORE.TryGetValue(face, out var pts)) turnScore += pts;
         UpdateUI();
@@ -4443,6 +4634,26 @@ public class GameManager : MonoBehaviour
         turnScore += pts;
         if (!string.IsNullOrEmpty(banner)) hintBanner?.Show(banner);
         UpdateUI();
+    }
+
+    // Filtre d'amour : +30% sur la bank de CE tour (au lieu d'un bonus fixe).
+    // Réutilise le système de modificateur de score ; ne remplace pas un mod déjà actif.
+    public void Artifacts_ActivateLoveFilterBankBonus(float multiplier = 1.3f)
+    {
+        if (_scoreMod.IsActive)
+        {
+            hintBanner?.Show("Filtre d’amour : un modificateur de score est déjà actif — bonus non appliqué.");
+            uiLog?.Append("Filtre d’amour : bonus ×1.3 ignoré (mod déjà actif).");
+            return;
+        }
+
+        ActivateScoreModifier(new ActiveScoreMod
+        {
+            mode = ActiveScoreMod.Mode.MarriageDot, // simple multiplicateur "pur"
+            multiplier = multiplier
+        });
+        hintBanner?.Show($"Filtre d’amour : +{Mathf.RoundToInt((multiplier - 1f) * 100)}% sur la bank de ce tour !");
+        uiLog?.Append($"Filtre d’amour : bonus ×{multiplier:0.##} sur la bank du tour.");
     }
 
     // Appelle cette routine pour "rouler" le dé d'ajout maintenant, avec variantes.
@@ -4930,6 +5141,7 @@ public class GameManager : MonoBehaviour
         if (PlayerHasTrait("poisonglass") && !traitPoisonGlassUsedVsAI && aiScore > 100)
         {
             traitPoisonGlassUsedVsAI = true;
+            RebuildTraitIcons();
             int before = aiScore;
             aiScore = Mathf.RoundToInt(aiScore / 2f);
             ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");

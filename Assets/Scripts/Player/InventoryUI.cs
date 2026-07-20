@@ -12,7 +12,6 @@ public class InventoryUI : MonoBehaviour
     public Button leftButton;
     public Button rightButton;
     public Button closeButton;                      // optionnel
-    public Button useButton;
     public TMP_Text titleLabel;                     // "ArtifactTitle" — nom de l'artefact sélectionné
 
     [Header("Drag & Drop")]
@@ -39,12 +38,6 @@ public class InventoryUI : MonoBehaviour
         if (rightButton) rightButton.onClick.AddListener(Next);
         if (closeButton) closeButton.onClick.AddListener(Hide);
 
-        if (useButton)
-        {
-            useButton.onClick.AddListener(OnUseClicked);
-            useButton.interactable = false; // désactivé par défaut
-        }
-
         // Panel fermé par défaut
         if (panel) panel.gameObject.SetActive(false);
 
@@ -56,17 +49,17 @@ public class InventoryUI : MonoBehaviour
         {
             cardView.UpdateMode(ArtifactCardMode.Inventory);
             cardView.SetTooltip(tooltip);
-            cardView.onClicked = _ => gameManager?.TryUseArtifactFromInventory(currentIndex);
-            // Drag & drop sur la table : active l'artefact courant (remplace le bouton USE)
+            // Activation UNIQUEMENT par drag & drop sur la table de jeu
             cardView.EnableDrag(dropZone, OnCardDroppedOnTable);
         }
     }
 
     // Appelé quand la carte d'inventaire est déposée sur la zone table.
-    void OnCardDroppedOnTable()
+    // Retourne true si l'artefact a réellement été joué (pilote l'animation de destruction).
+    bool OnCardDroppedOnTable()
     {
-        if (inventory == null || inventory.Count == 0) return;
-        gameManager?.TryUseArtifactFromInventory(currentIndex);
+        if (inventory == null || inventory.Count == 0) return false;
+        return gameManager != null && gameManager.TryUseArtifactFromInventory(currentIndex);
     }
 
     void OnEnable()
@@ -95,16 +88,12 @@ public class InventoryUI : MonoBehaviour
         ClampIndex();
         RefreshCard();
         gameManager?.OnInventoryOpenChanged(IsOpen); // met à jour le bouton Destroy
-
-        RefreshUseButtonState();
     }
 
     public void Hide()
     {
         if (panel) panel.gameObject.SetActive(false);
         gameManager?.OnInventoryOpenChanged(IsOpen); // met à jour le bouton Destroy
-
-        RefreshUseButtonState();
     }
 
     public void Toggle()
@@ -199,22 +188,4 @@ public class InventoryUI : MonoBehaviour
             rightButton.gameObject.SetActive(visible);
     }
 
-    void RefreshUseButtonState()
-    {
-        if (!useButton) return;
-        bool hasAny = (inventory != null && inventory.Count > 0);
-        useButton.interactable = IsOpen && hasAny;
-    }
-
-    void OnUseClicked()
-    {
-        // Protège des usages hors conditions
-        if (!IsOpen) return;
-        if (inventory == null || inventory.Count == 0) return;
-
-        // Déclenche l’usage de l’artefact courant
-        gameManager?.TryUseArtifactFromInventory(currentIndex);
-    }
-
-    
 }

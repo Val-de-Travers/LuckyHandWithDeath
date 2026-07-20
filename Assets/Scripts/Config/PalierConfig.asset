@@ -9,7 +9,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 0}
+  m_Script: {fileID: 11500000, guid: 481ae80bc0a17f84cb3a111cf8d94783, type: 3}
   m_Name: PalierConfig
   m_EditorClassIdentifier: Assembly-CSharp::PalierConfig
   paliers:
