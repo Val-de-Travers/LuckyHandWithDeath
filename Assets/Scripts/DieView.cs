@@ -22,6 +22,18 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     public bool isSunDie = false;   // uniquement pour le 5e dé (noir)
     public DiceSprites sprites;
 
+    [Header("Surlignage Flash")]
+    [Tooltip("Couleur du CADRE INTÉRIEUR affiché quand le dé fait partie d'un FLASH. " +
+             "Le contour de sélection (HoldOutline, bleu) reste inchangé et s'affiche en plus.")]
+    public Color flashHighlightColor = new Color(1f, 0.55f, 0.05f); // orange
+    [Tooltip("Épaisseur (px) des barres du cadre intérieur de Flash.")]
+    public float flashFrameThickness = 6f;
+    [Tooltip("Marge (px) entre le bord du dé et le cadre intérieur.")]
+    public float flashFrameInset = 5f;
+
+    bool highlightIsFlash = false;
+    GameObject flashFrame; // cadre intérieur généré à la volée (4 barres)
+
     [Header("Sun Die Visual")]
     [Tooltip("Si coché et isSunDie, affiche la face du dé en couleurs inversées (négatif).")]
     public bool invertSunDieColors = true;
@@ -68,7 +80,11 @@ public class DieView : MonoBehaviour, IPointerClickHandler
         selfImg.raycastTarget = true;
 
         if (lockIcon)      lockIcon.enabled = false;
-        if (holdHighlight) { holdHighlight.enabled = false; holdHighlight.raycastTarget = false; }
+        if (holdHighlight)
+        {
+            holdHighlight.enabled = false;
+            holdHighlight.raycastTarget = false;
+        }
 
         ApplySunDieMaterial();
     }
@@ -101,6 +117,7 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     public void ResetForNewTurn()
     {
         isLocked = false;
+        SetFlashHighlight(false);
         if (lockIcon)      lockIcon.enabled = false;
         if (holdHighlight) holdHighlight.enabled = false;
         SetFaceSprite(null); // efface l’affichage jusqu’au premier roll
@@ -140,6 +157,54 @@ public class DieView : MonoBehaviour, IPointerClickHandler
         isLocked = locked;
         if (lockIcon) lockIcon.enabled = locked;
         if (holdHighlight) holdHighlight.enabled = locked; // outline = miroir du lock
+    }
+
+    // Le dé fait-il partie d'un FLASH ? Un CADRE INTÉRIEUR orange épais s'affiche alors,
+    // en plus du contour de sélection bleu (qui garde sa couleur de scène).
+    // Piloté par GameManager (joueur ET adversaire).
+    public void SetFlashHighlight(bool isFlash)
+    {
+        if (highlightIsFlash == isFlash) return;
+        highlightIsFlash = isFlash;
+
+        if (isFlash && flashFrame == null) BuildFlashFrame();
+        if (flashFrame) flashFrame.SetActive(isFlash);
+    }
+
+    // Construit le cadre intérieur : 4 barres orange collées aux bords (avec marge),
+    // rendues AU-DESSUS de la face du dé.
+    void BuildFlashFrame()
+    {
+        flashFrame = new GameObject("FlashInnerFrame", typeof(RectTransform));
+        var frt = (RectTransform)flashFrame.transform;
+        frt.SetParent(transform, false);
+        frt.anchorMin = Vector2.zero;
+        frt.anchorMax = Vector2.one;
+        frt.offsetMin = new Vector2(flashFrameInset, flashFrameInset);
+        frt.offsetMax = new Vector2(-flashFrameInset, -flashFrameInset);
+        flashFrame.transform.SetAsLastSibling();
+
+        float t = Mathf.Max(1f, flashFrameThickness);
+        CreateFrameBar("Top",    new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),   new Vector2(0f, t));
+        CreateFrameBar("Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f),   new Vector2(0f, t));
+        CreateFrameBar("Left",   new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f),   new Vector2(t, 0f));
+        CreateFrameBar("Right",  new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f),   new Vector2(t, 0f));
+    }
+
+    void CreateFrameBar(string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 size)
+    {
+        var bar = new GameObject(name, typeof(RectTransform));
+        var rt = (RectTransform)bar.transform;
+        rt.SetParent(flashFrame.transform, false);
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.pivot = pivot;
+        rt.sizeDelta = size;
+        rt.anchoredPosition = Vector2.zero;
+
+        var img = bar.AddComponent<Image>();
+        img.color = flashHighlightColor;
+        img.raycastTarget = false;
     }
 
     void SetFaceSprite(DieFace? face)

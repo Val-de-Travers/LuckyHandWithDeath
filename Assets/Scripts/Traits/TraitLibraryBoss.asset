@@ -17,23 +17,23 @@ MonoBehaviour:
   - key: boss.obole
     traitName: Obole de Charon
     description: Chaque bank du joueur perd 10% (arrondi)
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.blacksun
     traitName: "Br\xFBlure du Soleil Noir"
     description: "Au premier flash du joueur, celui ci est annul\xE9."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.audit
     traitName: Audit des Morts
     description: "1 fois par match, le Boss annule un artefact jou\xE9 et te le retire
       de l\u2019inventaire."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.tide
     traitName: "Mar\xE9e du Destin"
     description: "La premi\xE8re relance du joueur dans la manche est miroir (le
       Boss gagne la meilleure face du jet annul\xE9)."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.tithe
     traitName: Tithe of Time
     description: "Si tu ne banques pas en 3 jets cons\xE9cutifs, +25 requis au score
       cible."
-    icon: {fileID: 0}
+    icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}

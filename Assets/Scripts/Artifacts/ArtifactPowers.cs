@@ -91,35 +91,38 @@ public class ArtifactPowers : MonoBehaviour
 #endif
     }
 
-    // Appelée par l’UI (bouton Use) via GameManager.TryUseArtifactFromInventory(...)
-    public void TryUseFromInventory(int index)
+    // Appelée par l’UI (drag & drop sur la table) via GameManager.TryUseArtifactFromInventory(...)
+    // Retourne true si l'artefact a réellement été joué (effet lancé ou confisqué par l'Audit),
+    // false si l'usage a été refusé — l'appelant s'en sert pour ne PAS jouer l'animation
+    // de destruction sur un artefact qui reste dans l'inventaire.
+    public bool TryUseFromInventory(int index)
     {
         EnsureRefs();
 
         if (!inventory)
-        { gm?.hintBanner?.Show("Inventaire introuvable."); return; }
+        { gm?.hintBanner?.Show("Inventaire introuvable."); return false; }
 
         if (inventory.Count == 0)
-        { gm?.hintBanner?.Show("Inventaire vide."); return; }
+        { gm?.hintBanner?.Show("Inventaire vide."); return false; }
 
         var a = inventory.GetAt(index);
         if (!a)
-        { gm?.hintBanner?.Show("Aucun artefact à cet emplacement."); return; }
+        { gm?.hintBanner?.Show("Aucun artefact à cet emplacement."); return false; }
 
         // Hors tour du joueur : seuls les artefacts Contre-Jeu sont utilisables
         if (gm != null && !gm.IsPlayersTurn && a.type != ArtifactType.ContreJeu)
         {
             gm.hintBanner?.Show("Vous ne pouvez utiliser cet artefact uniquement durant votre tour.");
-            return;
+            return false;
         }
 
         // Clé de recherche : effectKey si présent, sinon on retombe sur l'id de l'asset (normalisé).
         string lookup = !string.IsNullOrEmpty(a.effectKey) ? NormalizeKey(a.effectKey) : NormalizeKey(a.id);
         if (string.IsNullOrEmpty(lookup) || !registry.TryGetValue(lookup, out var effect))
-        { gm?.hintBanner?.Show("Cet artefact n'est pas encore implémenté."); return; }
+        { gm?.hintBanner?.Show("Cet artefact n'est pas encore implémenté."); return false; }
 
         if (!effect.IsUsableNow(gm, out var reason))
-        { gm?.hintBanner?.Show(reason ?? "Artefact inutilisable maintenant."); return; }
+        { gm?.hintBanner?.Show(reason ?? "Artefact inutilisable maintenant."); return false; }
 
         // TRAIT Boss "Audit des Morts" : 1×/match, l'artefact joué est annulé et confisqué
         if (gm != null && gm.Boss_TryAuditCancelArtifact())
@@ -129,7 +132,7 @@ public class ArtifactPowers : MonoBehaviour
             inventoryUI?.RefreshNow();
             gm?.inventoryDots?.Refresh();
             inventoryUI?.Hide();
-            return;
+            return true; // l'artefact quitte bien l'inventaire : l'animation est justifiée
         }
 
         // Déclenche l’effet, consomme à la fin
@@ -144,6 +147,7 @@ public class ArtifactPowers : MonoBehaviour
         // L'artefact est lancé (effet immédiat ou ciblage de dé en cours) :
         // on ferme l'inventaire pour libérer l'écran et éviter un second clic sur USE.
         inventoryUI?.Hide();
+        return true;
     }
 
     public static class ArtifactPowersHelpers

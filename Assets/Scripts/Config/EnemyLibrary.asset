@@ -118,7 +118,7 @@ MonoBehaviour:
     portrait: {fileID: 2446574473389622897, guid: 3a238cf1cc555de40b2c9407117b042e, type: 3}
     description: "Il a \xE9t\xE9 tabass\xE9 \xE0 mort par des villageois lors de
       l\u2019imp\xF4t f\xE9odale mensuel."
-    afflictionName: "Imp\xF4ts en douceur"
+    afflictionName: "Pr\xE9l\xE9vement \xE0 la source"
     afflictionDescription: "Il pr\xE9l\xE8ve 10 points sur tous les tours gagnant
       de l\u2019adversaire."
     afflictionKey: 
