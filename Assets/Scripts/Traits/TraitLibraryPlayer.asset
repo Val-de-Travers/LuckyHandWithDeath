@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 904d1e26ee5ae764a88df4845b297910, type: 3}
+  m_Name: TraitLibraryPlayer
+  m_EditorClassIdentifier: Assembly-CSharp::TraitLibrary
+  kind: 0
+  traits:
+  - key: player.tax
+    traitName: "Imp\xF4ts bourgeois"
+    description: "Si les 2 joueurs ont le m\xEAme score, le joueur adverse donne
+      20% de son score actuel au joueur."
+    icon: {fileID: 0}
+  - key: player.resurrection
+    traitName: "R\xE9surrection "
+    description: "Si 3 d\xE9faites le joueur peut lancer le d\xE9 SUN, si il fait
+      5-10 ou SUN il peut revenir dans la partie et rejouer la partie qu\u2019il
+      vient de perdre"
+    icon: {fileID: 0}
+  - key: 
+    traitName: 'Couronne  '
+    description: "Le propri\xE9taire est toujours le premier \xE0 jouer."
+    icon: {fileID: 0}

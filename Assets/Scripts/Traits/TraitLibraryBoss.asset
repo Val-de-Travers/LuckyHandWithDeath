@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 904d1e26ee5ae764a88df4845b297910, type: 3}
+  m_Name: TraitLibraryBoss
+  m_EditorClassIdentifier: Assembly-CSharp::TraitLibrary
+  kind: 1
+  traits:
+  - key: boss.obole
+    traitName: Obole de Charon
+    description: Chaque bank du joueur perd 10% (arrondi)
+    icon: {fileID: 0}
+  - key: boss.blacksun
+    traitName: "Br\xFBlure du Soleil Noir"
+    description: "Au premier flash du joueur, celui ci est annul\xE9."
+    icon: {fileID: 0}
+  - key: boss.audit
+    traitName: Audit des Morts
+    description: "1 fois par match, le Boss annule un artefact jou\xE9 et te le retire
+      de l\u2019inventaire."
+    icon: {fileID: 0}
+  - key: boss.tide
+    traitName: "Mar\xE9e du Destin"
+    description: "La premi\xE8re relance du joueur dans la manche est miroir (le
+      Boss gagne la meilleure face du jet annul\xE9)."
+    icon: {fileID: 0}
+  - key: boss.tithe
+    traitName: Tithe of Time
+    description: "Si tu ne banques pas en 3 jets cons\xE9cutifs, +25 requis au score
+      cible."
+    icon: {fileID: 0}

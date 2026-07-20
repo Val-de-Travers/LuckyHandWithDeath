@@ -288,6 +288,8 @@ public class GameManager : MonoBehaviour
 
     // ===== Tirage au sort du premier joueur =====
     private bool openingRollOffBusy = false; // anti double-clic pendant l'animation du tirage
+    private bool awaitingRollOffNext = false; // tirage résolu : on attend Next avant de commencer
+    private bool rollOffWinnerIsPlayer = true;
 
     // ===================== TRAITS / AFFIXES =====================
     // Traits acquis par le joueur (persistent sur toute la campagne)
@@ -298,6 +300,21 @@ public class GameManager : MonoBehaviour
     // Traits ennemis actifs affichables (nom + description + icône) pour l'AddBox de l'IA
     private readonly List<TraitDef> activeEnemyTraitInfos = new();
 
+    [Header("Traits / Catalogues (ScriptableObjects)")]
+    [Tooltip("Catalogue des traits JOUEUR (nom/desc/icône). Laisser vide → valeurs par défaut du code.")]
+    public TraitLibrary playerTraitLibrary;
+    [Tooltip("Catalogue des traits BOSS (nom/desc/icône). Laisser vide → valeurs par défaut du code.")]
+    public TraitLibrary bossTraitLibrary;
+
+    // Pools effectifs (library si assignée, sinon catalogue statique)
+    List<TraitDef> PlayerTraitPool()
+        => (playerTraitLibrary != null && playerTraitLibrary.traits != null && playerTraitLibrary.traits.Count > 0)
+            ? playerTraitLibrary.ToTraitDefs() : new List<TraitDef>(TraitCatalog.PlayerTraits);
+
+    List<TraitDef> BossTraitPool()
+        => (bossTraitLibrary != null && bossTraitLibrary.traits != null && bossTraitLibrary.traits.Count > 0)
+            ? bossTraitLibrary.ToTraitDefs() : new List<TraitDef>(TraitCatalog.BossTraits);
+
     [Header("Traits / UI (AddBox)")]
     [Tooltip("Conteneur (AddBoxP1) où sont instanciées les vignettes des traits du joueur.")]
     public RectTransform playerTraitsIconsRoot;
@@ -307,9 +324,37 @@ public class GameManager : MonoBehaviour
     public Vector2 traitIconSize = new Vector2(48f, 48f);
 
     [System.Serializable]
-    public class TraitIconEntry { public string key; public Sprite icon; }
-    [Tooltip("Icônes des traits Boss/Joueur (clé → sprite). Les traits ennemis utilisent afflictionIcon.")]
+    public class TraitIconEntry
+    {
+        public string key;   // clé du trait (rempli auto : boss.*, player.*)
+        public string label; // nom lisible (lecture seule, aide au repérage dans l'Inspector)
+        public Sprite icon;  // ← glisse ton sprite ici
+    }
+    [Tooltip("Icônes des traits Boss & Joueur. Les entrées (clé + nom) sont pré-remplies : il suffit de glisser un sprite sur chacune. Les traits ennemis, eux, utilisent le champ 'Affliction Icon' de l'ennemi.")]
     public List<TraitIconEntry> traitIcons = new();
+
+    // Garantit que la liste traitIcons contient une entrée par trait Boss/Joueur connu,
+    // pour que l'utilisateur n'ait qu'à glisser les sprites dans l'Inspector.
+    void EnsureTraitIconEntries()
+    {
+        if (traitIcons == null) traitIcons = new List<TraitIconEntry>();
+
+        void Ensure(TraitDef t)
+        {
+            if (t == null) return;
+            foreach (var e in traitIcons)
+                if (e != null && NormalizeTraitKey(e.key) == t.key) { e.label = t.name; return; }
+            traitIcons.Add(new TraitIconEntry { key = t.key, label = t.name, icon = null });
+        }
+
+        foreach (var t in TraitCatalog.BossTraits) Ensure(t);
+        foreach (var t in TraitCatalog.PlayerTraits) Ensure(t);
+    }
+
+    void OnValidate()
+    {
+        EnsureTraitIconEntries();
+    }
 
     Sprite GetTraitIcon(TraitDef t)
     {
@@ -785,9 +830,12 @@ public class GameManager : MonoBehaviour
         wimpoutLostTurnScore = 0;
 
         // Tirage au sort : chaque joueur lance un dé, le plus fort commence (égalité → relance)
+        // Seuls le dé 1 (joueur) et le dé SUN (adversaire) sont visibles/utilisés.
         currentTurn = Turn.Player;
         openingRollOffBusy = false;
+        awaitingRollOffNext = false;
         SetPhase(Phase.OpeningRollOff);
+        ShowOnlyRollOffDice();
         UpdateUI();
         RefreshCampaignUI();
         uiLog?.Append($"Match vs Adversaire {enemyIndex + 1}/{GetEnemyCountInPalier(palierIndex)} — Palier {palierIndex + 1}/{GetPalierCount()}");
@@ -835,30 +883,39 @@ public class GameManager : MonoBehaviour
             (palierIndex == 3) ||
             (palierIndex >= lastPalier);
 
-        if (traitActive)
+        // Trait PROPRE de l'adversaire : TOUJOURS affiché dans l'AddBox P2.
+        // S'il n'est pas activé à ce palier, on préfixe "(Pas activé)" et on n'ajoute pas
+        // sa clé aux traits actifs (aucun effet en jeu).
+        string ownKey = (currentEnemyInfo != null) ? NormalizeTraitKey(currentEnemyInfo.afflictionKey) : "";
+        if (!string.IsNullOrEmpty(ownKey))
         {
-            // Trait PROPRE de l'adversaire (tous paliers concernés, boss compris)
-            string ownKey = (currentEnemyInfo != null) ? NormalizeTraitKey(currentEnemyInfo.afflictionKey) : "";
-            if (!string.IsNullOrEmpty(ownKey))
+            string baseName = string.IsNullOrEmpty(currentEnemyInfo.afflictionName) ? ownKey : currentEnemyInfo.afflictionName;
+            string dispName = traitActive ? baseName : $"(Pas activé) {baseName}";
+
+            activeEnemyTraitInfos.Add(new TraitDef(ownKey, dispName,
+                currentEnemyInfo.afflictionDescription, currentEnemyInfo.afflictionIcon));
+
+            if (traitActive)
             {
                 activeEnemyTraitKeys.Add(ownKey);
-                activeEnemyTraitInfos.Add(new TraitDef(ownKey,
-                    string.IsNullOrEmpty(currentEnemyInfo.afflictionName) ? ownKey : currentEnemyInfo.afflictionName,
-                    currentEnemyInfo.afflictionDescription,
-                    currentEnemyInfo.afflictionIcon));
-                hintBanner?.Show($"Trait ennemi actif : {currentEnemyInfo.afflictionName} — {currentEnemyInfo.afflictionDescription}");
-                uiLog?.Append($"Trait ennemi actif : {currentEnemyInfo.afflictionName} ({ownKey})");
+                hintBanner?.Show($"Trait ennemi actif : {baseName} — {currentEnemyInfo.afflictionDescription}");
+                uiLog?.Append($"Trait ennemi actif : {baseName} ({ownKey})");
             }
-
-            // Palier 5 : + 1 trait de Boss aléatoire EN PLUS du trait propre
-            if (palierIndex >= lastPalier)
+            else
             {
-                var boss = TraitCatalog.BossTraits[campaignRng.Next(TraitCatalog.BossTraits.Length)];
-                activeEnemyTraitKeys.Add(boss.key);
-                activeEnemyTraitInfos.Add(boss);
-                hintBanner?.Show($"Trait de Boss : {boss.name} — {boss.desc}");
-                uiLog?.Append($"Trait de Boss ajouté : {boss.name}");
+                uiLog?.Append($"Trait ennemi PAS activé à ce palier : {baseName} ({ownKey})");
             }
+        }
+
+        // Palier 5 : + 1 trait de Boss aléatoire EN PLUS du trait propre
+        var bossPool = BossTraitPool();
+        if (traitActive && palierIndex >= lastPalier && bossPool.Count > 0)
+        {
+            var boss = bossPool[campaignRng.Next(bossPool.Count)];
+            activeEnemyTraitKeys.Add(boss.key);
+            activeEnemyTraitInfos.Add(boss);
+            hintBanner?.Show($"Trait de Boss : {boss.name} — {boss.desc}");
+            uiLog?.Append($"Trait de Boss ajouté : {boss.name}");
         }
 
         // ---- Artefact de l'adversaire (chance par palier) ----
@@ -1424,7 +1481,10 @@ public class GameManager : MonoBehaviour
             switch (phase)
             {
                 case Phase.OpeningRollOff:
-                    if (rollButton) rollButton.interactable = !openingRollOffBusy; break;
+                    // ROLL pour lancer/relancer (égalité) ; une fois résolu, seul Next est actif.
+                    if (rollButton) rollButton.interactable = !openingRollOffBusy && !awaitingRollOffNext;
+                    if (endRoundButton) endRoundButton.interactable = awaitingRollOffNext;
+                    break;
 
                 case Phase.AwaitFirstRoll:
                     if (rollButton) rollButton.interactable = true; break;
@@ -1590,7 +1650,14 @@ public class GameManager : MonoBehaviour
             {
                 flashPendingResolution = false;
                 clauseClearedBySelection = true; // annulable tant que la sélection n'est pas figée (ROLL/BANK)
-                ShowAction("Flash dégagé ! Tu peux BANK ou ROLL le reste.");
+
+                // Message clair selon qu'on peut banker maintenant ou non (seuil d'ouverture).
+                int entryCheck = GetEffectiveTurnScoreForEntry();
+                if (!playerOpened && entryCheck < ENTRY_THRESHOLD)
+                    ShowAction($"Flash dégagé ! Il te faut ≥ {ENTRY_THRESHOLD} pour ouvrir (tu as {entryCheck}) — ROLL pour continuer.");
+                else
+                    ShowAction("Flash dégagé ! Tu peux BANK, ou ROLL pour continuer.");
+
                 uiLog?.Append("Clause dégagée par sélection du joueur.");
                 SetPhase(Phase.Normal);
             }
@@ -1640,20 +1707,46 @@ public class GameManager : MonoBehaviour
 
     // Tirage au sort : dice[0] = dé du Joueur, dice[1] = dé de l'IA.
     // Le plus fort commence son tour ; égalité → on relance.
+    // Les deux dés SIMPLES (non-Soleil) utilisés pour le tirage : dé du joueur et dé de l'IA.
+    void GetRollOffDice(out DieView playerDie, out DieView aiDie)
+    {
+        playerDie = null;
+        aiDie = null;
+        if (dice == null) return;
+        foreach (var d in dice)
+        {
+            if (d == null || d.isSunDie) continue; // on ignore le dé Soleil
+            if (playerDie == null) playerDie = d;
+            else if (aiDie == null) { aiDie = d; break; }
+        }
+    }
+
+    // Pendant le tirage : seuls les 2 dés simples du tirage sont visibles.
+    void ShowOnlyRollOffDice()
+    {
+        if (dice == null) return;
+        GetRollOffDice(out var pDie, out var aDie);
+        foreach (var d in dice)
+        {
+            if (d == null) continue;
+            d.gameObject.SetActive(d == pDie || d == aDie);
+        }
+    }
+
     IEnumerator ResolveOpeningRollOff()
     {
-        if (dice == null || dice.Count < 2 || dice[0] == null || dice[1] == null)
+        GetRollOffDice(out var playerDie, out var aiDie);
+
+        if (playerDie == null || aiDie == null || playerDie == aiDie)
         {
             // Pas assez de dés pour un tirage : le joueur commence par défaut.
+            HideDice(false);
             StartNewTurn(Turn.Player);
             yield break;
         }
 
         openingRollOffBusy = true;
         ApplyButtonsState();
-
-        var playerDie = dice[0];
-        var aiDie = dice[1];
 
         playerDie.Roll();
         yield return new WaitForSeconds(0.45f);
@@ -1673,15 +1766,16 @@ public class GameManager : MonoBehaviour
         }
 
         bool playerStarts = pv > av;
+        rollOffWinnerIsPlayer = playerStarts;
         ShowAction(playerStarts
-            ? $"Vous remportez le tirage ({pv} contre {av}) — à vous de commencer !"
-            : $"L'IA remporte le tirage ({av} contre {pv}) — elle commence.");
+            ? $"Vous remportez le tirage ({pv} contre {av}) — à vous de commencer ! Appuyez sur Next."
+            : $"L'IA remporte le tirage ({av} contre {pv}) — elle commence. Appuyez sur Next.");
         uiLog?.Append($"Tirage au sort : Joueur {pv} / IA {av} → {(playerStarts ? "Joueur" : "IA")} commence.");
 
-        yield return new WaitForSeconds(1.2f);
-
+        // On attend que le joueur appuie sur Next (pas de démarrage automatique).
         openingRollOffBusy = false;
-        StartNewTurn(playerStarts ? Turn.Player : Turn.AI);
+        awaitingRollOffNext = true;
+        if (endRoundButton) endRoundButton.interactable = true;
     }
 
     void OnPressBank()
@@ -1816,6 +1910,16 @@ public class GameManager : MonoBehaviour
         // Pendant la sélection d’artefact ou de trait, le choix se fait en cliquant les cartes
         if (awaitingArtifactPick || awaitingTraitPick) return;
 
+        // Tirage résolu → Next lance le premier tour.
+        if (awaitingRollOffNext)
+        {
+            awaitingRollOffNext = false;
+            if (endRoundButton) endRoundButton.interactable = false;
+            HideDice(false);
+            StartNewTurn(rollOffWinnerIsPlayer ? Turn.Player : Turn.AI);
+            return;
+        }
+
         // Fenêtre de Contre-Jeu ouverte : Next = laisser l'IA continuer/terminer son tour
         if (awaitingCounterPlay)
         {
@@ -1840,7 +1944,7 @@ public class GameManager : MonoBehaviour
             if (lastOfPalier && palier2or4)
             {
                 var options = new List<TraitDef>();
-                foreach (var t in TraitCatalog.PlayerTraits)
+                foreach (var t in PlayerTraitPool())
                     if (!PlayerHasTrait(t.key)) options.Add(t);
 
                 if (options.Count > 0)
@@ -1888,6 +1992,11 @@ public class GameManager : MonoBehaviour
 
         if (indicesToRoll.Count == 0)
         {
+            // Hot-dice : relance complète obligatoire. Les dés d'AJOUT (LovePotion, Dé surprise…)
+            // ne sont PAS relancés — ils sont retirés/détruits à ce moment (usage unique).
+            CleanupLingeringAddedDice();
+            CleanupAddedDice();
+
             foreach (var d in dice) if (d != null) d.SetLocked(false);
             frozenLocks.Clear();
             flashLockIndices.Clear();
@@ -1996,7 +2105,7 @@ public class GameManager : MonoBehaviour
 
             if (eligibleLockIndices.Count > 0)
             {
-                ShowAction($"FLASH {(int)currentFlashFace} — sélectionne un 5/10/SUN pour marquer (puis ROLL), ou ROLL pour tenter la Clause.");
+                ShowAction($"FLASH {(int)currentFlashFace} (+{eval.pointsGained}) — sélectionne un 5/10/SUN pour dégager le Flash (puis BANK/ROLL), ou ROLL pour tenter la Clause.");
                 uiLog?.Append($"FLASH {(int)currentFlashFace} (+{eval.pointsGained}) → Clause (choix laissé au joueur).");
             }
             else
@@ -3906,10 +4015,13 @@ public class GameManager : MonoBehaviour
         lastRolledIndices.Add(idx);
         yield return null;
 
+        // On réévalue TOUT le pool non verrouillé : le dé relancé ET les dés marquants
+        // déjà présents non sélectionnés doivent tous pouvoir être choisis par le joueur.
+        var unlocked = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null && !dice[i].isLocked).ToList();
+        var eval = EvaluateRoll(unlocked, scoreSingles: false);
+
         if (phase == Phase.Clause)
         {
-            // En Clause: pas de flash attendu avec 1 dé, mais on gère au cas où.
-            var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
             if (eval.createdFlash)
             {
                 foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); }
@@ -3917,12 +4029,13 @@ public class GameManager : MonoBehaviour
                 currentFlashFace = eval.flashFace;
                 flashPendingResolution = true;
                 UpdateUI();
+                FillEligibleFromIndices(unlocked.Where(i => !eval.flashLockIndices.Contains(i)).ToList());
                 ShowAction($"FLASH {(int)currentFlashFace} (via artefact).");
                 SetPhase(Phase.Clause);
                 yield break;
             }
 
-            FillEligibleFromIndices(lastRolledIndices);
+            FillEligibleFromIndices(unlocked);
 
             if (eligibleLockIndices.Count > 0)
             {
@@ -3931,7 +4044,7 @@ public class GameManager : MonoBehaviour
             }
             else
             {
-                bool matchedFlashFace = lastRolledIndices.Any(i => MapFlashableFace(dice[i].GetFace()) == currentFlashFace);
+                bool matchedFlashFace = unlocked.Any(i => MapFlashableFace(dice[i].GetFace()) == currentFlashFace);
                 if (matchedFlashFace)
                 {
                     ShowAction($"Clause : {(int)currentFlashFace} retombe — appuie sur ROLL pour continuer.");
@@ -3946,13 +4059,10 @@ public class GameManager : MonoBehaviour
                     SetPhase(Phase.WaitEnd);
                 }
             }
-
-            yield break;
         }
         else
         {
             // Phase normale
-            var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
             if (eval.createdFlash)
             {
                 foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); }
@@ -3960,22 +4070,21 @@ public class GameManager : MonoBehaviour
                 currentFlashFace = eval.flashFace;
                 flashPendingResolution = true;
                 UpdateUI();
-                var remaining = lastRolledIndices; // == idx seul
-                FillEligibleFromIndices(remaining);
+                FillEligibleFromIndices(unlocked.Where(i => !eval.flashLockIndices.Contains(i)).ToList());
                 SetPhase(Phase.Clause);
                 ShowAction($"FLASH {(int)currentFlashFace} (via artefact) — Clause.");
                 yield break;
             }
 
-            FillEligibleFromIndices(lastRolledIndices);
+            FillEligibleFromIndices(unlocked);
             if (eligibleLockIndices.Count > 0)
             {
-                ShowAction("Ce dé peut marquer : sélectionne-le pour ajouter les points.");
+                ShowAction("Sélectionne les dés marquants (5/10/SUN), puis BANK ou ROLL.");
                 SetPhase(Phase.Normal);
             }
             else
             {
-                // Aucun point → wimpout immédiat
+                // Aucun point nulle part → wimpout immédiat
                 wimpoutLostTurnScore = turnScore;
                 turnScore = 0;
                 UpdateUI();

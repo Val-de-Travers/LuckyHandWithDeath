@@ -5,7 +5,8 @@ using UnityEngine.EventSystems;
 
 public enum ArtifactCardMode { Selection, Inventory }
 
-public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler, IPointerClickHandler
+public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler, IPointerClickHandler,
+    IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     [Header("UI Refs")]
     public Image icon;
@@ -35,6 +36,35 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
 
     public System.Action<ArtifactCardView> onClicked;
 
+    // ==== Drag & drop (mode Inventaire) : glisser la carte sur la table pour activer l'artefact ====
+    [HideInInspector] public bool dragEnabled = false;
+    ArtifactDropZone dropZone;
+    System.Action onDroppedOnTable;
+    Camera dragCam;
+
+    // Sauvegarde de la position d'origine (on déplace la carte elle-même, pas une copie)
+    bool dragging;
+    Transform dragOrigParent;
+    int dragOrigSibling;
+    Vector2 dragOrigAnchoredPos;
+    Quaternion dragOrigRotation;
+
+    [Header("Drag FX")]
+    [Tooltip("Amplitude du balancement (degrés) selon la vitesse horizontale de la souris.")]
+    public float swayPerVelocity = 1.4f;
+    public float swayMaxAngle = 22f;
+    public float swayLerpSpeed = 14f;
+    public float swayReturnSpeed = 90f; // vitesse de retour du sway vers 0 (deg/s)
+    float swayTargetZ;
+
+    // Active/désactive le drag pour cette carte (appelé par InventoryUI).
+    public void EnableDrag(ArtifactDropZone zone, System.Action onDropped)
+    {
+        dropZone = zone;
+        onDroppedOnTable = onDropped;
+        dragEnabled = (zone != null);
+    }
+
     void Awake()
     {
         cg = GetComponent<CanvasGroup>();
@@ -45,6 +75,15 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
 
     void Update()
     {
+        // Pendant le drag : balancement (sway) selon la vitesse horizontale de la souris.
+        if (dragging)
+        {
+            swayTargetZ = Mathf.MoveTowards(swayTargetZ, 0f, Time.unscaledDeltaTime * swayReturnSpeed);
+            float z = Mathf.LerpAngle(transform.localEulerAngles.z, swayTargetZ, Time.unscaledDeltaTime * swayLerpSpeed);
+            transform.localRotation = Quaternion.Euler(0f, 0f, z);
+            return; // on ne fait pas le hover-scale pendant le drag
+        }
+
         float targetScale = isHover ? hoverScale : normalScale;
         transform.localScale = Vector3.Lerp(transform.localScale, Vector3.one * targetScale, Time.unscaledDeltaTime * scaleLerpSpeed);
 
@@ -165,10 +204,112 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public void OnPointerClick(PointerEventData eventData)
     {
         // Mode Selection : cliquer la carte choisit l'artefact (câblé par GameManager).
-        // Mode Inventory : pas de clic direct (on passe par le bouton USE) pour éviter
-        // toute utilisation accidentelle d'un artefact.
+        // Mode Inventory : pas de clic direct (glisser-déposer sur la table pour activer).
         if (mode == ArtifactCardMode.Selection)
             onClicked?.Invoke(this);
+    }
+
+    // ==== Drag & drop ====
+    bool CanDrag => dragEnabled && mode == ArtifactCardMode.Inventory && artifact != null;
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (!CanDrag) return;
+        if (tooltip != null) tooltip.Hide();
+
+        var rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        dragCam = (rootCanvas && rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay) ? rootCanvas.worldCamera : null;
+
+        // On déplace LA CARTE elle-même : on mémorise sa place pour la remettre ensuite.
+        var selfRT = (RectTransform)transform;
+        dragOrigParent = transform.parent;
+        dragOrigSibling = transform.GetSiblingIndex();
+        dragOrigAnchoredPos = selfRT.anchoredPosition;
+        dragOrigRotation = transform.localRotation;
+
+        if (rootCanvas)
+        {
+            transform.SetParent(rootCanvas.transform, true); // sort du layout de l'inventaire
+            transform.SetAsLastSibling();                    // au-dessus de tout
+        }
+        if (cg) cg.blocksRaycasts = false;                   // laisse passer le raycast vers la table
+
+        dragging = true;
+        swayTargetZ = 0f;
+        if (dropZone) dropZone.SetHighlight(true);
+        MoveSelf(eventData.position);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!dragging) return;
+        MoveSelf(eventData.position);
+
+        // Balancement : la carte penche à l'opposé du déplacement horizontal (effet "trimbalé").
+        swayTargetZ = Mathf.Clamp(-eventData.delta.x * swayPerVelocity, -swayMaxAngle, swayMaxAngle);
+
+        // La table s'illumine uniquement quand la carte est réellement au-dessus.
+        if (dropZone) dropZone.SetHighlight(dropZone.Contains(eventData.position, eventData.pressEventCamera));
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (!dragging) return;
+        dragging = false;
+
+        bool droppedOnTable = CanDrag && dropZone && dropZone.Contains(eventData.position, eventData.pressEventCamera);
+
+        // Remet la carte à sa place d'origine dans l'inventaire (rotation comprise).
+        if (dragOrigParent)
+        {
+            transform.SetParent(dragOrigParent, true);
+            transform.SetSiblingIndex(dragOrigSibling);
+            ((RectTransform)transform).anchoredPosition = dragOrigAnchoredPos;
+        }
+        transform.localRotation = dragOrigRotation;
+        swayTargetZ = 0f;
+        if (cg) cg.blocksRaycasts = true;
+        if (dropZone) dropZone.SetHighlight(false);
+
+        // Déposé sur la table → effet de destruction + activation de l'artefact.
+        if (droppedOnTable)
+        {
+            SpawnDestructionFx(eventData.position);
+            onDroppedOnTable?.Invoke();
+        }
+    }
+
+    // Vignette "détruite" (tremblement + rotation + rétrécissement + fondu) à l'endroit du dépôt.
+    void SpawnDestructionFx(Vector2 screenPos)
+    {
+        var rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        if (!rootCanvas) return;
+
+        var go = new GameObject("ArtifactDestroyFx", typeof(RectTransform));
+        go.transform.SetParent(rootCanvas.transform, false);
+        go.transform.SetAsLastSibling();
+
+        var img = go.AddComponent<Image>();
+        img.sprite = icon ? icon.sprite : null;
+        img.preserveAspect = true;
+        img.raycastTarget = false;
+        ((RectTransform)go.transform).sizeDelta = ((RectTransform)transform).sizeDelta;
+
+        var cam = (rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay) ? rootCanvas.worldCamera : null;
+        var canvasRT = (RectTransform)rootCanvas.transform;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, screenPos, cam, out var local))
+            ((RectTransform)go.transform).anchoredPosition = local;
+
+        go.AddComponent<DragDestroyFx>();
+    }
+
+    void MoveSelf(Vector2 screenPos)
+    {
+        var rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        if (!rootCanvas) return;
+        var canvasRT = (RectTransform)rootCanvas.transform;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, screenPos, dragCam, out var local))
+            ((RectTransform)transform).anchoredPosition = local;
     }
 
 }
