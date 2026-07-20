@@ -289,12 +289,17 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         var rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
         if (!rootCanvas) return;
 
+        // Sprite de l'artefact : l'Image de la carte, sinon l'icône de l'asset.
+        // Sans sprite, on ne spawne rien (une Image sans sprite = carré blanc).
+        Sprite fxSprite = (icon && icon.sprite) ? icon.sprite : (artifact ? artifact.icon : null);
+        if (fxSprite == null) return;
+
         var go = new GameObject("ArtifactDestroyFx", typeof(RectTransform));
         go.transform.SetParent(rootCanvas.transform, false);
         go.transform.SetAsLastSibling();
 
         var img = go.AddComponent<Image>();
-        img.sprite = icon ? icon.sprite : null;
+        img.sprite = fxSprite;
         img.preserveAspect = true;
         img.raycastTarget = false;
         ((RectTransform)go.transform).sizeDelta = ((RectTransform)transform).sizeDelta;

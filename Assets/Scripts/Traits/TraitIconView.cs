@@ -18,14 +18,19 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     // used : le trait a un effet unique (1×/match) et il a déjà servi. La vignette est
     // atténuée et son titre préfixé de « (utilisé) ».
+    // dimmed : le trait n'est PAS ACTIVÉ (palier trop bas) — même atténuation, sans préfixe
+    // « (utilisé) » (le nom porte déjà « (Pas activé) »).
     // Note : Setup n'est appelée qu'une fois par vignette (les vues sont recréées à chaque
     // RebuildTraitIcons), l'atténuation ne se cumule donc pas.
-    public void Setup(Sprite sprite, string traitName, string description, ArtifactTooltip sharedTooltip, bool used = false)
+    public void Setup(Sprite sprite, string traitName, string description, ArtifactTooltip sharedTooltip,
+                      bool used = false, bool dimmed = false)
     {
         tooltip = sharedTooltip;
 
         string title = used ? $"(utilisé) {traitName}" : traitName;
         tipText = string.IsNullOrEmpty(description) ? title : $"{title}\n{description}";
+
+        bool faded = used || dimmed;
 
         if (icon)
         {
@@ -33,7 +38,7 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             icon.enabled = sprite != null;
             icon.preserveAspect = true;
             icon.raycastTarget = true;
-            if (used)
+            if (faded)
             {
                 var c = icon.color;
                 c.a *= UsedAlpha;   // conserve le fond sombre éventuel du mode "sans icône"
@@ -49,7 +54,7 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
             {
                 fallbackLabel.text = title;
                 fallbackLabel.raycastTarget = true;
-                if (used)
+                if (faded)
                 {
                     var lc = fallbackLabel.color;
                     lc.a *= UsedAlpha;

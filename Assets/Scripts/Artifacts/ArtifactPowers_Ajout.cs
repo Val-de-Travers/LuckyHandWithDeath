@@ -83,11 +83,49 @@ public class LoveFilterEffect : IArtifactEffect
     };
     static DieFace Normalize(DieFace f) => (f == DieFace.Sun) ? DieFace.Ten : f;
 
+    // Pré-calcule ce que donnerait le Filtre SANS créer le dé d'ajout :
+    // face la plus faible parmi les dés libres, et possibilité de flash / single.
+    static bool ComputeOutcome(GameManager gm, out DieFace weakest, out bool canFlash, out bool canSingle)
+    {
+        weakest = DieFace.Ten; canFlash = false; canSingle = false;
+        if (gm == null || gm.dice == null) return false;
+
+        var candidates = new List<int>();
+        for (int i = 0; i < gm.dice.Count; i++)
+            if (gm.dice[i] != null && !gm.dice[i].isLocked) candidates.Add(i);
+        if (candidates.Count == 0) return false;
+
+        bool any = false;
+        foreach (var i in candidates)
+        {
+            var f = Normalize(gm.dice[i].GetFace());
+            if (!any || Rank(f) < Rank(weakest)) { weakest = f; any = true; }
+        }
+
+        int same = 0, suns = 0;
+        foreach (var i in candidates)
+        {
+            var f = gm.dice[i].GetFace();
+            if (f == weakest) same++;
+            else if (f == DieFace.Sun) suns++;
+        }
+
+        canFlash = (same >= 2) || (same >= 1 && suns >= 1); // le dé d'ajout complète le triple
+        canSingle = (weakest == DieFace.Five || weakest == DieFace.Ten);
+        return true;
+    }
+
     public bool IsUsableNow(GameManager gm, out string reason)
     {
         reason = null;
         if (gm == null || !gm.CanUseRerollTurnNow()) { reason = "Utilisable après un jet."; return false; }
-        if (gm.dice == null || gm.dice.All(d => d == null)) { reason = "Aucun dé sur la table."; return false; }
+        if (!ComputeOutcome(gm, out _, out bool canFlash, out bool canSingle))
+        { reason = "Aucun dé libre sur la table."; return false; }
+
+        // ⛔ Sans flash NI single possible, l'artefact serait gâché : usage refusé (non consommé).
+        if (!canFlash && !canSingle)
+        { reason = "Filtre d’amour : aucune combinaison possible avec ce jet — artefact conservé."; return false; }
+
         return true;
     }
 
@@ -179,11 +217,11 @@ public class LoveFilterEffect : IArtifactEffect
         }
         else
         {
-            // Aucun point : retirer le dé d’ajout et laisser l’état tel quel
+            // Aucun point : on retire le dé d’ajout et on N’APPELLE PAS done →
+            // l’artefact N’EST PAS consommé (sécurité, normalement bloqué par IsUsableNow).
             gm.Artifacts_RemoveAddedDie(add);
-            gm.hintBanner?.Show("Filtre d’amour : aucune combinaison immédiate.");
+            gm.hintBanner?.Show("Filtre d’amour : aucune combinaison possible — artefact conservé.");
             gm.Artifacts_RefreshUI();
-            done?.Invoke();
             yield break;
         }
     }

@@ -201,6 +201,42 @@ public class GameManager : MonoBehaviour
     public TMP_InputField devForceFacesInput;  // ex: "5 5 10 2 6" (S ou 100 = Sun), dans l'ordre des dés
     public Button devForceFacesButton;         // applique les valeurs au PROCHAIN jet
 
+    [Header("Dev Tools - Master Toggle")]
+    [Tooltip("Toggle qui affiche/masque TOUS les objets de la scène dont le nom commence par \"Dev\". " +
+             "⚠️ Ne pas nommer ce Toggle \"Dev...\" (il s'exclut de lui-même, mais autant éviter).")]
+    public Toggle devMasterToggle;
+
+    readonly List<GameObject> devObjectsCache = new();
+
+    // Recense tous les objets "Dev*" de la scène (y compris inactifs), hors le Toggle maître.
+    void CacheDevObjects()
+    {
+        devObjectsCache.Clear();
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            foreach (var tr in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (!tr || !tr.name.StartsWith("Dev")) continue;
+                if (devMasterToggle &&
+                    (tr.gameObject == devMasterToggle.gameObject ||
+                     tr.IsChildOf(devMasterToggle.transform) ||
+                     devMasterToggle.transform.IsChildOf(tr)))
+                    continue; // ne jamais se masquer soi-même
+                devObjectsCache.Add(tr.gameObject);
+            }
+        }
+    }
+
+    // Coché → outils visibles ; décoché → outils masqués.
+    void SetDevObjectsVisible(bool visible)
+    {
+        if (devObjectsCache.Count == 0) CacheDevObjects();
+        foreach (var go in devObjectsCache)
+            if (go) go.SetActive(visible);
+        uiLog?.Append($"[DEV] Outils de debug {(visible ? "affichés" : "masqués")} ({devObjectsCache.Count} objets).");
+    }
+
     private enum Turn { Player, AI }
     private Turn currentTurn = Turn.Player;
 
@@ -488,7 +524,9 @@ public class GameManager : MonoBehaviour
             le.preferredWidth = traitIconSize.x;
             le.preferredHeight = traitIconSize.y;
 
-            view.Setup(sprite, t.name, t.desc, tooltip, IsTraitConsumed(t.key, isPlayerSide));
+            // Côté IA : un trait présent mais NON ACTIVÉ à ce palier est affiché atténué.
+            bool inactive = !isPlayerSide && !activeEnemyTraitKeys.Contains(t.key);
+            view.Setup(sprite, t.name, t.desc, tooltip, IsTraitConsumed(t.key, isPlayerSide), inactive);
         }
     }
 
@@ -801,6 +839,14 @@ public class GameManager : MonoBehaviour
         {
             devForceFacesButton.gameObject.SetActive(showDevTools);
             devForceFacesButton.onClick.AddListener(OnPressDevForceFaces);
+        }
+
+        // ---- Dev Master Toggle : affiche/masque tous les objets "Dev*" ----
+        if (devMasterToggle)
+        {
+            CacheDevObjects(); // recensés maintenant, avant tout masquage
+            devMasterToggle.onValueChanged.AddListener(SetDevObjectsVisible);
+            SetDevObjectsVisible(devMasterToggle.isOn); // applique l'état initial du Toggle
         }
 
         // Barre de temps du contre-jeu masquée par défaut
@@ -2057,6 +2103,72 @@ public class GameManager : MonoBehaviour
         StartNewTurn(next);
     }
 
+    // ===================== FULL (5 dés identiques) =====================
+    private enum FullKind { None, Points, WinInstant, Supernova }
+
+    // Classe un jet de 5 dés identiques.
+    // 6 → victoire instantanée · 10/SUN (si Supernova activée) → élimination ·
+    // 2/3/4/5 (et 10 si Supernova désactivée) → 100 × valeur faciale.
+    FullKind ClassifyFull(List<int> rolled, out DieFace face, out int points)
+    {
+        face = DieFace.Two; points = 0;
+        if (rolled == null || rolled.Count != 5) return FullKind.None;
+
+        var f0 = dice[rolled[0]].GetFace();
+        for (int k = 1; k < 5; k++)
+            if (dice[rolled[k]] == null || dice[rolled[k]].GetFace() != f0) return FullKind.None;
+
+        face = f0;
+        if (f0 == DieFace.Six) return FullKind.WinInstant;
+        if ((f0 == DieFace.Ten || f0 == DieFace.Sun) && ENABLE_SUPERNOVA) return FullKind.Supernova;
+
+        int faceValue = (f0 == DieFace.Sun) ? 10 : (int)f0;
+        points = 100 * faceValue; // 2→200, 3→300, 4→400, 5→500, 10→1000
+        return FullKind.Points;
+    }
+
+    // Résout un éventuel Full. Retourne true si un Full a été traité (le caller doit yield break).
+    bool HandleFullIfAny(List<int> rolled, bool isAI)
+    {
+        var kind = ClassifyFull(rolled, out var face, out int pts);
+        if (kind == FullKind.None) return false;
+
+        string rollerName = (currentTurn == Turn.Player) ? PLAYER_NAME : AI_NAME;
+        string opponentName = (currentTurn == Turn.Player) ? AI_NAME : PLAYER_NAME;
+
+        if (kind == FullKind.WinInstant)
+        {
+            ShowAction($"FULL de 6 ! Victoire instantanée de {rollerName} !");
+            uiLog?.Append($"FULL de 6 — {rollerName} gagne le match.");
+            EndMatch(rollerName);
+            return true;
+        }
+
+        if (kind == FullKind.Supernova)
+        {
+            ShowAction($"SUPERNOVA (Full de {(face == DieFace.Sun ? "SUN" : ((int)face).ToString())}) ! Score trop élevé — {rollerName} est éliminé !");
+            uiLog?.Append($"SUPERNOVA — {rollerName} éliminé (l'adversaire gagne).");
+            EndMatch(opponentName);
+            return true;
+        }
+
+        // FULL de points : crédite 100 × la face, puis relance OBLIGATOIRE des 5 dés (hot dice).
+        turnScore += pts;
+        foreach (var i in rolled)
+            if (i >= 0 && i < dice.Count && dice[i] != null) { dice[i].SetLocked(true); frozenLocks.Add(i); }
+
+        ClearClauseState();
+        flashVisualIndices.Clear();
+        eligibleLockIndices.Clear();
+        eligibleLockPoints.Clear();
+        UpdateUI();
+
+        ShowAction($"FULL de {(int)face} ! +{pts} points — les 5 dés sont chauds : relance OBLIGATOIRE.");
+        uiLog?.Append($"FULL de {(int)face} : +{pts} points (relance des 5 imposée).");
+        SetPhase(isAI ? Phase.AITurnPlaying : Phase.Normal);
+        return true;
+    }
+
     // ===================== ROLL / CLAUSE / IA =====================
     IEnumerator ResolvePlayerRoll()
     {
@@ -2142,13 +2254,8 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
-        {
-            ShowAction($"SUPERNOVA ! 5×10 — {PLAYER_NAME} gagne.");
-            uiLog?.Append("SUPERNOVA — match terminé.");
-            EndMatch(PLAYER_NAME);
-            yield break;
-        }
+        // FULL (5 dés identiques) : victoire (6), supernova (10) ou 100 × la face.
+        if (HandleFullIfAny(lastRolledIndices, isAI: false)) yield break;
 
         var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
 
@@ -2159,6 +2266,7 @@ public class GameManager : MonoBehaviour
                 dice[i].SetLocked(true);
                 frozenLocks.Add(i);
                 flashLockIndices.Add(i);
+                flashVisualIndices.Add(i); // surlignage orange persistant
             }
             turnScore += eval.pointsGained;
             currentFlashFace = eval.flashFace;
@@ -2273,8 +2381,8 @@ public class GameManager : MonoBehaviour
 
         ApplyPendingFaceOverrides(lastRolledIndices); // faces forcées (dev / artefacts)
 
-        if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
-        { ShowAction($"SUPERNOVA ! 5×10 — {PLAYER_NAME} gagne."); EndMatch(PLAYER_NAME); yield break; }
+        // FULL (5 dés identiques) même pendant la Clause.
+        if (HandleFullIfAny(lastRolledIndices, isAI: false)) yield break;
 
         var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
 
@@ -2285,6 +2393,7 @@ public class GameManager : MonoBehaviour
                 dice[i].SetLocked(true);
                 frozenLocks.Add(i);
                 flashLockIndices.Add(i);
+                flashVisualIndices.Add(i); // surlignage orange persistant
             }
             turnScore += eval.pointsGained;
             UpdateUI();
@@ -2607,6 +2716,7 @@ public class GameManager : MonoBehaviour
         aiFlashCancelled = true;        // le Flash ne sera pas rejoué (pas de Clause)
 
         ClearClauseState();
+        flashVisualIndices.Clear();     // le Flash est annulé : plus de surlignage orange
         RecomputeAIScoreFromLockedDice(); // retire les points du Flash annulé
         aiDiceChangedByCounter = true;    // l'IA re-sélectionnera après Next
 
@@ -2929,7 +3039,9 @@ public class GameManager : MonoBehaviour
         flashPendingResolution = false;
         currentFlashFace = DieFace.Two;
         flashLockIndices.Clear();
-        flashVisualIndices.Clear(); // le Flash n'existe plus : retour au surlignage normal
+        // ⚠️ flashVisualIndices n'est PAS vidé ici : le surlignage orange des dés d'un Flash
+        // doit SURVIVRE à la résolution de la Clause. Il n'est retiré que lorsque les dés
+        // sont réellement relancés/annulés (nouveau jet complet, Corne de sommeil, Flash brisé).
     }
 
     // Verrouille une série de dés de l'IA UN PAR UN, avec un petit délai + pulse,
@@ -2968,6 +3080,7 @@ public class GameManager : MonoBehaviour
             foreach (var d in dice) if (d != null) d.SetLocked(false);
             frozenLocks.Clear();
             ClearClauseState();
+            flashVisualIndices.Clear(); // tous les dés sont relancés : plus d'orange
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
         else
@@ -2978,6 +3091,7 @@ public class GameManager : MonoBehaviour
                 foreach (var d in dice) if (d != null) d.SetLocked(false);
                 frozenLocks.Clear();
                 ClearClauseState();
+                flashVisualIndices.Clear(); // tous les dés sont relancés : plus d'orange
                 indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
             }
         }
@@ -3027,8 +3141,8 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        if (ENABLE_SUPERNOVA && indicesToRoll.Count == 5 && indicesToRoll.All(i => dice[i].GetFace() == DieFace.Ten))
-        { EndMatch(AI_NAME); yield break; }
+        // FULL (5 dés identiques) côté IA : victoire (6), supernova (10 → l'IA est éliminée), ou points.
+        if (HandleFullIfAny(indicesToRoll, isAI: true)) yield break;
 
         var evalFlashOnly = EvaluateRoll(indicesToRoll, scoreSingles: false);
 
@@ -3074,6 +3188,7 @@ public class GameManager : MonoBehaviour
             if (!flashStillValid)
             {
                 ClearClauseState();
+                flashVisualIndices.Clear(); // le Flash n'existe plus : plus de surlignage orange
                 hintBanner?.Show("Le Flash de l'IA a été brisé.");
                 uiLog?.Append("Contre-Jeu : Flash IA brisé (dés conservés).");
                 SetPhase(Phase.AITurnPlaying);
@@ -3237,8 +3352,8 @@ public class GameManager : MonoBehaviour
             foreach (var idx in indicesToRoll) dice[idx].Roll();
             yield return new WaitForSeconds(0.1f);
 
-            if (ENABLE_SUPERNOVA && indicesToRoll.Count == 5 && indicesToRoll.All(i => dice[i].GetFace() == DieFace.Ten))
-            { EndMatch(isAI ? AI_NAME : PLAYER_NAME); yield break; }
+            // FULL (5 dés identiques) pendant une Clause auto-résolue.
+            if (HandleFullIfAny(indicesToRoll, isAI)) yield break;
 
             if (isAI && indicesToRoll.Count == 1)
             {
@@ -3281,6 +3396,11 @@ public class GameManager : MonoBehaviour
             bool matchedFlashFace = indicesToRoll.Any(idx => MapFlashableFace(dice[idx].GetFace()) == currentFlashFace);
             if (matchedFlashFace)
             {
+                if (isAI)
+                {
+                    hintBanner?.Show($"Clause de l'IA : le {(int)currentFlashFace} retombe — elle relance !");
+                    uiLog?.Append($"Clause IA : {(int)currentFlashFace} retombe, relance.");
+                }
                 yield return new WaitForSeconds(CLAUSE_REPEAT_DELAY);
                 continue;
             }
@@ -4202,7 +4322,7 @@ public class GameManager : MonoBehaviour
         {
             if (eval.createdFlash)
             {
-                foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); }
+                foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); flashVisualIndices.Add(i); }
                 turnScore += eval.pointsGained;
                 currentFlashFace = eval.flashFace;
                 flashPendingResolution = true;
@@ -4243,7 +4363,7 @@ public class GameManager : MonoBehaviour
             // Phase normale
             if (eval.createdFlash)
             {
-                foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); }
+                foreach (var i in eval.flashLockIndices) { dice[i].SetLocked(true); frozenLocks.Add(i); flashLockIndices.Add(i); flashVisualIndices.Add(i); }
                 turnScore += eval.pointsGained;
                 currentFlashFace = eval.flashFace;
                 flashPendingResolution = true;
@@ -4316,12 +4436,8 @@ public class GameManager : MonoBehaviour
 
         ApplyPendingFaceOverrides(lastRolledIndices);
 
-        if (ENABLE_SUPERNOVA && lastRolledIndices.Count == 5 && lastRolledIndices.All(i => dice[i].GetFace() == DieFace.Ten))
-        {
-            ShowAction($"SUPERNOVA ! 5×10 — {PLAYER_NAME} gagne.");
-            EndMatch(PLAYER_NAME);
-            yield break;
-        }
+        // FULL (5 dés identiques) après un relancé complet (Temps niv.1).
+        if (HandleFullIfAny(lastRolledIndices, isAI: false)) yield break;
 
         var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
         CheckLoveFilterBonus(eval.createdFlash, eval.flashFace, lastRolledIndices);
@@ -4333,6 +4449,7 @@ public class GameManager : MonoBehaviour
                 dice[i].SetLocked(true);
                 frozenLocks.Add(i);
                 flashLockIndices.Add(i);
+                flashVisualIndices.Add(i); // surlignage orange persistant
             }
             turnScore += eval.pointsGained;
             currentFlashFace = eval.flashFace;
@@ -4717,6 +4834,7 @@ public class GameManager : MonoBehaviour
                 dice[i].SetLocked(true);
                 frozenLocks.Add(i);
                 flashLockIndices.Add(i);
+                flashVisualIndices.Add(i); // surlignage orange persistant
             }
             turnScore += eval.pointsGained;
             currentFlashFace = eval.flashFace;
