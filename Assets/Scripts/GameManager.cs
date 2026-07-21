@@ -296,6 +296,18 @@ public class GameManager : MonoBehaviour
     // Score du tour perdu au dernier wimpout du joueur — restauré si un artefact
     // de relance (Os du Tricheur) offre une seconde chance sur ce jet.
     private int wimpoutLostTurnScore = 0;
+    // Le tour du joueur est perdu MAIS son score reste affiché (« en péril ») tant qu'il
+    // n'a pas confirmé la fin du tour : un artefact peut encore le sauver.
+    private bool turnScoreAtRisk = false;
+
+    // Marque le score du tour du JOUEUR comme perdu-en-attente : il reste affiché et
+    // n'est réellement remis à zéro qu'au changement de tour (StartNewTurn).
+    void MarkPlayerTurnScoreAtRisk()
+    {
+        wimpoutLostTurnScore = turnScore;
+        turnScoreAtRisk = turnScore > 0;
+        UpdateUI();
+    }
 
     [Header("Dev/Artifact Pick Actions")]
     public Button devSkipArtifactPickButton;       // "Skip"
@@ -325,6 +337,9 @@ public class GameManager : MonoBehaviour
     // Un contre-jeu a modifié les dés → à la fermeture de la fenêtre, l'IA re-sélectionne
     // les dés marquants libres (elle ne les relance pas).
     private bool aiDiceChangedByCounter = false;
+    // Dés relancés par un contre-jeu (Coup de table, Clocher…) : le résultat est DÉFINITIF,
+    // l'IA ne peut pas les relancer une seconde fois ce tour-ci.
+    private readonly HashSet<int> aiNoRerollIndices = new();
 
     [Header("Contre-Jeu / Timer")]
     [Tooltip("Durée (s) de la fenêtre de contre-jeu avant auto-Next.")]
@@ -372,6 +387,11 @@ public class GameManager : MonoBehaviour
     public RectTransform aiTraitsIconsRoot;
     [Tooltip("Taille des vignettes de trait.")]
     public Vector2 traitIconSize = new Vector2(48f, 48f);
+    [Tooltip("Au-delà de ce nombre de traits, les vignettes se chevauchent pour tenir dans la boîte.")]
+    public int traitOverlapThreshold = 3;
+    [Range(0f, 0.9f)]
+    [Tooltip("Proportion de chevauchement (0.35 = les vignettes se recouvrent de 35% de leur largeur).")]
+    public float traitOverlapRatio = 0.35f;
 
     [System.Serializable]
     public class TraitIconEntry
@@ -468,7 +488,6 @@ public class GameManager : MonoBehaviour
             case "estoc":         return isPlayerSide && estocUsedThisMatchPlayer;
             case "boss.blacksun": return traitBlackSunUsed;
             case "boss.audit":    return traitAuditUsed;
-            case "boss.tide":     return traitTideUsed;
             default:              return false; // traits permanents ou à usage non limité
         }
     }
@@ -480,14 +499,19 @@ public class GameManager : MonoBehaviour
         for (int i = root.childCount - 1; i >= 0; i--)
             Destroy(root.GetChild(i).gameObject);
 
-        // Layout horizontal par défaut si le conteneur n'en a pas
-        if (!root.GetComponent<UnityEngine.UI.LayoutGroup>())
+        // Layout horizontal ; au-delà de traitOverlapThreshold vignettes, on les fait
+        // se CHEVAUCHER (spacing négatif) pour qu'elles tiennent dans la boîte.
+        // Le survol met la vignette au premier plan avec un léger zoom (TraitIconView).
+        var layout = root.GetComponent<HorizontalLayoutGroup>();
+        if (!layout && !root.GetComponent<UnityEngine.UI.LayoutGroup>())
+            layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
+
+        if (layout)
         {
-            var h = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.childForceExpandWidth = false;
-            h.childForceExpandHeight = false;
-            h.childAlignment = TextAnchor.MiddleLeft;
-            h.spacing = 4f;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.spacing = (traits.Count > traitOverlapThreshold) ? -traitIconSize.x * traitOverlapRatio : 4f;
         }
 
         var tooltip = EnsureTooltip();
@@ -561,7 +585,8 @@ public class GameManager : MonoBehaviour
     private bool traitPoisonGlassUsedVsAI = false;     // Verre Empoisonné (joueur → IA)
     private bool traitBlackSunUsed = false;            // Soleil Noir (boss)
     private bool traitAuditUsed = false;               // Audit des Morts (boss)
-    private bool traitTideUsed = false;                // Marée du Destin (boss)
+    // « Marée montante » (boss) : effet permanent, points gagnés par le Boss à chaque relance du joueur.
+    private const int TIDE_POINTS_PER_REROLL = 10;
     private int  traitTitheExtra = 0;                  // Tithe of Time : +25 cumulés sur le score cible du joueur
     private int  traitTitheRollStreak = 0;             // jets consécutifs du joueur sans bank
     private bool aiHasRolledThisMatch = false;         // Pistage (IA)
@@ -907,6 +932,7 @@ public class GameManager : MonoBehaviour
         flashPendingResolution = false;
         clauseClearedBySelection = false;
         wimpoutLostTurnScore = 0;
+        turnScoreAtRisk = false;
         pendingWinCheckOnContinue = false;
 
         // Tirage au sort : chaque joueur lance un dé, le plus fort commence (égalité → relance)
@@ -947,7 +973,6 @@ public class GameManager : MonoBehaviour
         traitPoisonGlassUsedVsAI = false;
         traitBlackSunUsed = false;
         traitAuditUsed = false;
-        traitTideUsed = false;
         traitTitheExtra = 0;
         traitTitheRollStreak = 0;
         aiHasRolledThisMatch = false;
@@ -1125,7 +1150,9 @@ public class GameManager : MonoBehaviour
             defeatsCount++;
             uiLog?.Append($"Défaite enregistrée ({defeatsCount}/3).");
 
-            if (defeatsCount >= 3)
+            // Fin de campagne : 3 défaites OU défaite contre le Boss (dernier palier).
+            bool lostToBoss = palierIndex >= GetPalierCount() - 1;
+            if (defeatsCount >= 3 || lostToBoss)
             {
                 // Trait Résurrection : lancer le dé SUN pour revenir dans la partie
                 if (PlayerHasTrait("player.resurrection") && !resurrectionUsed)
@@ -1134,7 +1161,8 @@ public class GameManager : MonoBehaviour
                     return;
                 }
 
-                ShowGameOver("3 défaites — Campagne perdue");
+                ShowGameOver(lostToBoss ? "Vaincu par le Boss — Campagne perdue"
+                                        : "3 défaites — Campagne perdue");
                 return;
             }
         }
@@ -1229,7 +1257,9 @@ public class GameManager : MonoBehaviour
 
         if (success)
         {
-            defeatsCount = 2; // on revient à 2 défaites et on rejoue le match perdu
+            // On annule la défaite qui vient d'être enregistrée et on rejoue le match perdu.
+            // (Utilise un décrément : une défaite contre le Boss peut survenir à 1 seule défaite.)
+            defeatsCount = Mathf.Max(0, defeatsCount - 1);
             hintBanner?.Show($"Résurrection ({(f == DieFace.Sun ? "SUN" : ((int)f).ToString())}) ! Vous rejouez la partie perdue.");
             uiLog?.Append("Résurrection réussie — le match perdu est rejoué.");
             awaitingNextMatch = false;
@@ -1318,11 +1348,13 @@ public class GameManager : MonoBehaviour
         aiFlashIndices.Clear();
         aiFlashCancelled = false;
         aiDiceChangedByCounter = false;
+        aiNoRerollIndices.Clear();
 
         turnScore = 0;
         flashPendingResolution = false;
         clauseClearedBySelection = false;
         wimpoutLostTurnScore = 0;
+        turnScoreAtRisk = false;
         pendingWinCheckOnContinue = false;
 
         frozenLocks.Clear();
@@ -1443,7 +1475,10 @@ public class GameManager : MonoBehaviour
                 ? $"{aiScore} / {goal} pts"
                 : $"{aiScore} / {ENTRY_THRESHOLD} pts";
 
-        if (turnScoreText) turnScoreText.text = $"Score du tour : {turnScore}";
+        if (turnScoreText)
+            turnScoreText.text = turnScoreAtRisk
+                ? $"Score du tour : {turnScore} (en péril)"
+                : $"Score du tour : {turnScore}";
 
         // Inventaire visible de l'adversaire (léger : simples assignations)
         RefreshAIArtifactUI();
@@ -1602,7 +1637,7 @@ public class GameManager : MonoBehaviour
                         // (mutableLocks) pour banquer. S'il n'y a aucun dé marquant à sélectionner
                         // (ex : points ajoutés par un artefact), la banque reste possible.
                         bool selectionOk = mutableLocks.Count > 0 || eligibleLockIndices.Count == 0;
-                        bool canBank = !flashPendingResolution && selectionOk &&
+                        bool canBank = !flashPendingResolution && selectionOk && !turnScoreAtRisk &&
                                     (playerOpened ? (turnScore > 0) : (entryCheckScore >= entry));
 
                         if (allLocked) canBank = false; // relance obligatoire si 5 scorent
@@ -1897,6 +1932,10 @@ public class GameManager : MonoBehaviour
         if (flashPendingResolution)
         { ShowAction("Un Flash doit être dégagé avant de banquer."); return; }
 
+        // Score « en péril » (tour perdu, sauvable par artefact) : impossible de banquer.
+        if (turnScoreAtRisk)
+        { ShowAction("Ce tour est perdu : sauvez-le avec un artefact, sinon CONTINUE."); return; }
+
         // Il faut avoir sélectionné au moins un dé marquant si un tel dé est disponible sur CE jet
         // (empêche de banquer un Flash / des points d'un jet précédent sans rien sélectionner).
         if (mutableLocks.Count == 0 && eligibleLockIndices.Count > 0)
@@ -1924,6 +1963,7 @@ public class GameManager : MonoBehaviour
         eligibleLockPoints.Clear();
         clauseClearedBySelection = false; // sélection figée par la banque
         wimpoutLostTurnScore = 0;
+        turnScoreAtRisk = false;
 
         // ==== NOUVEAU : appliquer le modificateur avant d'ajouter au total ====
         string modBadge;
@@ -2197,6 +2237,9 @@ public class GameManager : MonoBehaviour
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
 
+        // Un dé relancé n'appartient plus à l'ancien Flash : on retire son contour orange.
+        foreach (var idx in indicesToRoll) flashVisualIndices.Remove(idx);
+
         foreach (var idx in indicesToRoll) dice[idx].Roll();
         lastRolledIndices.Clear();
         lastRolledIndices.AddRange(indicesToRoll);
@@ -2225,20 +2268,13 @@ public class GameManager : MonoBehaviour
             uiLog?.Append($"Trait Runes magiques (joueur) : flash de {(int)flashFace}.");
         }
 
-        // ---- TRAIT Boss Marée du Destin : la 1re relance du joueur est annulée,
-        //      le Boss gagne la meilleure face du jet annulé ----
-        if (isReroll && !traitTideUsed && EnemyTraitActive("boss.tide"))
+        // ---- TRAIT Boss « Marée montante » : chaque relance du joueur profite au Boss ----
+        if (isReroll && EnemyTraitActive("boss.tide"))
         {
-            traitTideUsed = true;
-            RebuildTraitIcons();
-            int best = lastRolledIndices.Max(i => HighValueOf(dice[i].GetFace()));
-            aiScore += best;
-            ShowAction($"Marée du Destin : votre relance est engloutie — le Boss gagne {best} pts !");
-            uiLog?.Append($"Trait Boss Marée du Destin : +{best} au Boss, jet relancé.");
+            aiScore += TIDE_POINTS_PER_REROLL;
+            ShowAction($"Marée montante : votre relance fait monter les eaux — +{TIDE_POINTS_PER_REROLL} pts pour le Boss !");
+            uiLog?.Append($"Trait Boss Marée montante : +{TIDE_POINTS_PER_REROLL} au Boss (relance du joueur).");
             UpdateUI();
-            yield return new WaitForSeconds(0.9f);
-            foreach (var idx in lastRolledIndices) dice[idx].Roll(); // le vrai jet (miroir consommé)
-            yield return null;
         }
 
         // ---- TRAIT Boss Tithe of Time : 3 jets consécutifs sans bank → +25 au score cible ----
@@ -2328,9 +2364,7 @@ public class GameManager : MonoBehaviour
 
             if (eligibleLockIndices.Count == 0)
             {
-                wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
-                turnScore = 0;
-                UpdateUI();
+                MarkPlayerTurnScoreAtRisk(); // récupérable via un artefact de sauvetage
 
                 // Un artefact de Transformation/Relance peut encore renverser ce jet.
                 bool canStillRescue = PlayerHasRescueArtifact();
@@ -2373,6 +2407,9 @@ public class GameManager : MonoBehaviour
             flashVisualIndices.Clear();
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
+
+        // Un dé relancé n'appartient plus à l'ancien Flash : on retire son contour orange.
+        foreach (var idx in indicesToRoll) flashVisualIndices.Remove(idx);
 
         foreach (var idx in indicesToRoll) dice[idx].Roll();
         lastRolledIndices.Clear();
@@ -2440,9 +2477,7 @@ public class GameManager : MonoBehaviour
             uiLog?.Append($"Clause perdue — pas de Coup d'estoc (traits joueur : {(playerTraits.Count == 0 ? "aucun" : string.Join(", ", playerTraits.Select(t => t.key)))}).");
         }
 
-        wimpoutLostTurnScore = turnScore; // récupérable via un artefact de sauvetage
-        turnScore = 0;
-        UpdateUI();
+        MarkPlayerTurnScoreAtRisk(); // récupérable via un artefact de sauvetage
 
         // La Clause est perdue : le Flash n'est plus « en attente de résolution ».
         // Sans ce nettoyage, flashPendingResolution restait vrai en phase WaitEnd et un
@@ -2791,6 +2826,7 @@ public class GameManager : MonoBehaviour
         dice[i].Roll();               // relance unique
         dice[i].SetLocked(false);     // désélectionné
         dice[i].Pulse(0.22f, 1.12f);
+        aiNoRerollIndices.Add(i);     // ⛔ l'IA ne pourra PAS le relancer ensuite
         RecomputeAIScoreFromLockedDice();
         aiDiceChangedByCounter = true; // l'IA re-sélectionnera après Next (sans relancer)
     }
@@ -3081,20 +3117,28 @@ public class GameManager : MonoBehaviour
             frozenLocks.Clear();
             ClearClauseState();
             flashVisualIndices.Clear(); // tous les dés sont relancés : plus d'orange
+            aiNoRerollIndices.Clear();  // relance complète : les blocages de contre-jeu tombent
             indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
         }
         else
         {
-            indicesToRoll = dice.Select((d, i) => (d, i)).Where(t => t.d != null && !t.d.isLocked).Select(t => t.i).ToList();
+            // ⛔ Les dés relancés par un contre-jeu ne sont PAS rejoués par l'IA.
+            indicesToRoll = dice.Select((d, i) => (d, i))
+                                .Where(t => t.d != null && !t.d.isLocked && !aiNoRerollIndices.Contains(t.i))
+                                .Select(t => t.i).ToList();
             if (indicesToRoll.Count == 0)
             {
                 foreach (var d in dice) if (d != null) d.SetLocked(false);
                 frozenLocks.Clear();
                 ClearClauseState();
                 flashVisualIndices.Clear(); // tous les dés sont relancés : plus d'orange
+                aiNoRerollIndices.Clear();
                 indicesToRoll = Enumerable.Range(0, dice.Count).ToList();
             }
         }
+
+        // Un dé neuf est relancé : il n'appartient plus à l'ancien Flash (contour orange).
+        foreach (var idx in indicesToRoll) flashVisualIndices.Remove(idx);
 
         foreach (var idx in indicesToRoll) dice[idx].Roll();
         yield return new WaitForSeconds(0.1f);
@@ -3349,6 +3393,9 @@ public class GameManager : MonoBehaviour
 
         while (true)
         {
+            // Un dé relancé n'appartient plus à l'ancien Flash : on retire son contour orange.
+            foreach (var idx in indicesToRoll) flashVisualIndices.Remove(idx);
+
             foreach (var idx in indicesToRoll) dice[idx].Roll();
             yield return new WaitForSeconds(0.1f);
 
@@ -3416,9 +3463,10 @@ public class GameManager : MonoBehaviour
             }
 
             // Wimpout
-            if (!isAI) wimpoutLostTurnScore = turnScore; // récupérable via Os du Tricheur
-            turnScore = 0;
-            UpdateUI();
+            // Joueur : le score reste affiché (« en péril ») et peut encore être sauvé.
+            // IA : perte immédiate.
+            if (!isAI) MarkPlayerTurnScoreAtRisk();
+            else { turnScore = 0; UpdateUI(); }
             if (isAI)
             {
                 CheckWinConditionOnTurnEnded();
@@ -3519,14 +3567,18 @@ public class GameManager : MonoBehaviour
         }
 
         // Défaite joueur.
-        // Si c'est la 3e défaite (fin de campagne), on NE propose PAS de phase d'achat :
-        // on va directement au Game Over via CONTINUE.
-        bool willBeGameOver = (defeatsCount + 1) >= 3;
+        // Pas de phase d'achat si la campagne s'arrête là :
+        //  · 3e défaite, OU
+        //  · défaite contre le BOSS (dernier palier) — la campagne se termine.
+        // Dans les deux cas la Résurrection reste possible (gérée par AdvanceToNextOpponentOrPalier).
+        bool isBossFight = palierIndex >= GetPalierCount() - 1;
+        bool willBeGameOver = (defeatsCount + 1) >= 3 || isBossFight;
         if (willBeGameOver)
         {
             awaitingVictoryNext = false;
-            ShowAction($"Défaite ! {winner} remporte le match. 3e défaite — CONTINUE pour terminer.");
-            uiLog?.Append("3e défaite — Game Over (pas de phase d’obtention).");
+            string cause = isBossFight ? "Le Boss vous terrasse" : "3e défaite";
+            ShowAction($"Défaite ! {winner} remporte le match. {cause} — CONTINUE pour terminer.");
+            uiLog?.Append($"{cause} — Game Over (pas de phase d’obtention).");
             if (turnLabel) turnLabel.text = $"Défaite — {winner} a gagné. Appuie sur CONTINUE.";
             if (endRoundButton) endRoundButton.interactable = true; // CONTINUE → Advance → ShowGameOver
             RefreshCampaignUI();
@@ -3952,9 +4004,7 @@ public class GameManager : MonoBehaviour
             else
             {
                 // Pas de points et pas de retombée sur la face du Flash → wimpout
-                wimpoutLostTurnScore = turnScore;
-                turnScore = 0;
-                UpdateUI();
+                MarkPlayerTurnScoreAtRisk();
                 ShowAction("Wimpout (Clause).");
                 SetPhase(Phase.WaitEnd);
             }
@@ -3968,8 +4018,7 @@ public class GameManager : MonoBehaviour
             }
             else
             {
-                wimpoutLostTurnScore = turnScore;
-                turnScore = 0; UpdateUI();
+                MarkPlayerTurnScoreAtRisk();
                 ShowAction("Toujours aucun point — Wimpout.");
                 SetPhase(Phase.WaitEnd);
             }
@@ -4350,9 +4399,7 @@ public class GameManager : MonoBehaviour
                 }
                 else
                 {
-                    wimpoutLostTurnScore = turnScore;
-                    turnScore = 0;
-                    UpdateUI();
+                    MarkPlayerTurnScoreAtRisk();
                     ShowAction("Wimpout (Clause).");
                     SetPhase(Phase.WaitEnd);
                 }
@@ -4389,9 +4436,7 @@ public class GameManager : MonoBehaviour
             else
             {
                 // Aucun point nulle part → wimpout immédiat
-                wimpoutLostTurnScore = turnScore;
-                turnScore = 0;
-                UpdateUI();
+                MarkPlayerTurnScoreAtRisk();
                 ShowAction("Wimpout — tour terminé.");
                 SetPhase(Phase.WaitEnd);
             }
@@ -4427,6 +4472,7 @@ public class GameManager : MonoBehaviour
         UpdateUI();
 
         var rollableIndices = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null).ToList();
+        flashVisualIndices.Clear(); // lancé complet rejoué : aucun contour orange ne subsiste
         foreach (var i in rollableIndices)
             dice[i].Roll();
 
@@ -4474,9 +4520,7 @@ public class GameManager : MonoBehaviour
         else
         {
             // Wimpout : le score conservé est perdu (risque du relancé), récupérable via Os du Tricheur
-            wimpoutLostTurnScore = turnScore;
-            turnScore = 0;
-            UpdateUI();
+            MarkPlayerTurnScoreAtRisk();
             ShowAction("Wimpout.");
             SetPhase(Phase.WaitEnd);
         }
@@ -4582,12 +4626,20 @@ public class GameManager : MonoBehaviour
     // Restaure le score du tour perdu au wimpout (l'artefact vient de sauver le tour).
     void RestoreWimpoutScoreIfAny()
     {
+        // Cas historique : le score avait ete remis a zero -> on le restaure.
         if (wimpoutLostTurnScore > 0 && turnScore == 0)
         {
             turnScore = wimpoutLostTurnScore;
-            wimpoutLostTurnScore = 0;
             uiLog?.Append($"Artefact : tour sauvé, score du tour restauré ({turnScore}).");
         }
+        // Cas courant : le score etait « en peril » et reste affiche -> on leve le peril.
+        else if (turnScoreAtRisk && turnScore > 0)
+        {
+            uiLog?.Append($"Artefact : tour sauvé, score du tour conservé ({turnScore}).");
+        }
+
+        wimpoutLostTurnScore = 0;
+        turnScoreAtRisk = false;
     }
 
     public void Artifacts_ReevaluateAfterDiceChanged(string banner = null)
@@ -5237,6 +5289,12 @@ public class GameManager : MonoBehaviour
                     }
             }
         }
+
+        // ⚠️ La prévisualisation était calculée mais jamais affichée : on l'écrit ici.
+        // Le joueur voit ainsi en temps réel ce que vaudra sa bank (ex : Dot de mariage ×2).
+        scoreModLabel.text = string.IsNullOrEmpty(perTurnPreview)
+            ? $"Bank estimée : {previewAfterPerTurn}"
+            : $"Bank estimée : {perTurnPreview}";
     }
 
 

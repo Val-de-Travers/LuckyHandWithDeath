@@ -64,8 +64,48 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         }
     }
 
+    // ==== Mise en avant au survol (les vignettes se chevauchent quand elles sont nombreuses) ====
+    [Header("Hover")]
+    public float hoverScale = 1.25f;
+    public float scaleLerpSpeed = 14f;
+
+    bool isHover;
+    Canvas sortingCanvas; // permet de passer devant les voisines SANS changer l'ordre du layout
+
+    void Update()
+    {
+        float target = isHover ? hoverScale : 1f;
+        transform.localScale = Vector3.Lerp(transform.localScale, Vector3.one * target,
+                                            Time.unscaledDeltaTime * scaleLerpSpeed);
+    }
+
+    // Met la vignette au premier plan via un Canvas local trié.
+    // ⚠️ On n'utilise PAS SetAsLastSibling : dans un LayoutGroup, l'ordre des enfants
+    // définit la POSITION — la vignette sauterait en fin de rangée, quitterait le curseur
+    // et provoquerait un clignotement enter/exit.
+    void SetFront(bool front)
+    {
+        if (front && sortingCanvas == null)
+        {
+            sortingCanvas = gameObject.GetComponent<Canvas>();
+            if (!sortingCanvas) sortingCanvas = gameObject.AddComponent<Canvas>();
+            // Un Canvas imbriqué a besoin de son propre raycaster pour rester survolable.
+            if (!gameObject.GetComponent<GraphicRaycaster>())
+                gameObject.AddComponent<GraphicRaycaster>();
+        }
+
+        if (sortingCanvas)
+        {
+            sortingCanvas.overrideSorting = front;
+            sortingCanvas.sortingOrder = front ? 10 : 0;
+        }
+    }
+
     public void OnPointerEnter(PointerEventData eventData)
     {
+        isHover = true;
+        SetFront(true);
+
         if (tooltip != null && !string.IsNullOrEmpty(tipText))
         {
             tooltip.Show(tipText, eventData.position);
@@ -81,6 +121,9 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        isHover = false;
+        SetFront(false);
+
         if (tooltip != null) tooltip.Hide();
     }
 }

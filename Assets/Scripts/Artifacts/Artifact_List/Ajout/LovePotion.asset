@@ -15,7 +15,8 @@ MonoBehaviour:
   id: LovePotion
   displayName: Filtre d'amour
   description: "Ajoute un d\xE9 suppl\xE9mentaire et copie le d\xE9 le plus faible
-    en le comptabilisant avec les autres, si cela cr\xE9e un flash gagne +25 bonus."
+    en le comptabilisant avec les autres, si cela cr\xE9e un flash gagne +30% du
+    score total final."
   icon: {fileID: 21300000, guid: 697365cddc42cb048b22607ef80b9598, type: 3}
   rarity: 0
   type: 1

@@ -28,9 +28,9 @@ MonoBehaviour:
       de l\u2019inventaire."
     icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.tide
-    traitName: "Mar\xE9e du Destin"
-    description: "La premi\xE8re relance du joueur dans la manche est miroir (le
-      Boss gagne la meilleure face du jet annul\xE9)."
+    traitName: "Mar\xE9e montante"
+    description: "Chaque relance du joueur fait monter la mar\xE9e : +10 points pour
+      le Boss."
     icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   - key: boss.tithe
     traitName: Tithe of Time

@@ -278,20 +278,23 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         // aucune cible valide, effet non implémenté…) laisse la carte intacte.
         if (droppedOnTable)
         {
+            // ⚠️ On capture l'image AVANT l'usage : consommer l'artefact re-lie aussitôt
+            // la carte à l'artefact suivant de l'inventaire (sinon l'animation de
+            // destruction afficherait la mauvaise icône).
+            Sprite fxSprite = (icon && icon.sprite) ? icon.sprite : (artifact ? artifact.icon : null);
+
             bool used = onDroppedOnTable != null && onDroppedOnTable.Invoke();
-            if (used) SpawnDestructionFx(eventData.position);
+            if (used) SpawnDestructionFx(eventData.position, fxSprite);
         }
     }
 
     // Vignette "détruite" (tremblement + rotation + rétrécissement + fondu) à l'endroit du dépôt.
-    void SpawnDestructionFx(Vector2 screenPos)
+    void SpawnDestructionFx(Vector2 screenPos, Sprite fxSprite)
     {
         var rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
         if (!rootCanvas) return;
 
-        // Sprite de l'artefact : l'Image de la carte, sinon l'icône de l'asset.
         // Sans sprite, on ne spawne rien (une Image sans sprite = carré blanc).
-        Sprite fxSprite = (icon && icon.sprite) ? icon.sprite : (artifact ? artifact.icon : null);
         if (fxSprite == null) return;
 
         var go = new GameObject("ArtifactDestroyFx", typeof(RectTransform));

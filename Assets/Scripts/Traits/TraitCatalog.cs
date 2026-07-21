@@ -32,8 +32,8 @@ public static class TraitCatalog
             "Au premier flash du joueur, la plus petite face restante devient 2 (une seule fois)."),
         new TraitDef("boss.audit",    "Audit des Morts",
             "1×/match, le Boss annule un artefact joué et le retire de l'inventaire."),
-        new TraitDef("boss.tide",     "Marée du Destin",
-            "La première relance du joueur dans la manche est annulée : le Boss gagne la meilleure face du jet annulé."),
+        new TraitDef("boss.tide",     "Marée montante",
+            "Chaque relance du joueur fait monter la marée : +10 points pour le Boss."),
         new TraitDef("boss.tithe",    "Tithe of Time",
             "Si le joueur ne banque pas en 3 jets consécutifs, +25 requis au score cible."),
     };
