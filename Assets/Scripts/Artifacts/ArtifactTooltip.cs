@@ -12,6 +12,8 @@ public class ArtifactTooltip : MonoBehaviour
     [Header("Settings")]
     public Vector2 offset = new Vector2(18f, -18f);
     public float maxWidth = 420f;
+    [Tooltip("Ordre de tri du tooltip : doit rester supérieur à celui des éléments mis au premier plan au survol (vignettes de traits = 10).")]
+    public int tooltipSortingOrder = 500;
 
     Canvas rootCanvas;
     Camera uiCam;
@@ -20,6 +22,24 @@ public class ArtifactTooltip : MonoBehaviour
     {
         if (!root) root = GetComponent<RectTransform>();
         rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+
+        // Le tooltip ne doit JAMAIS intercepter la souris : sinon, quand il est recalé
+        // sous le curseur (bord bas de l'écran), il vole le survol à l'élément source
+        // et provoque un clignotement enter/exit en boucle.
+        var cg = GetComponent<CanvasGroup>();
+        if (!cg) cg = gameObject.AddComponent<CanvasGroup>();
+        cg.blocksRaycasts = false;
+        cg.interactable = false;
+        foreach (var g in GetComponentsInChildren<Graphic>(true))
+            g.raycastTarget = false;
+
+        // Le tooltip doit s'afficher AU-DESSUS de tout — y compris des éléments qui se
+        // mettent eux-mêmes au premier plan via un Canvas trié (ex : vignettes de traits
+        // survolées). Un simple SetAsLastSibling ne suffit pas dans ce cas.
+        var sortCanvas = GetComponent<Canvas>();
+        if (!sortCanvas) sortCanvas = gameObject.AddComponent<Canvas>();
+        sortCanvas.overrideSorting = true;
+        sortCanvas.sortingOrder = tooltipSortingOrder;
 
         // ✅ Anchors centrés + pivot en haut-gauche
         if (root)
@@ -75,6 +95,11 @@ public class ArtifactTooltip : MonoBehaviour
                 Mathf.Clamp(pref.y + 16f, 40f, canvasRT.rect.height * 0.6f)
             );
             root.sizeDelta = size;
+
+            // Si le tooltip déborderait en bas, on le bascule AU-DESSUS du curseur
+            // plutôt que de le recaler par-dessus (évite qu'il masque l'élément survolé).
+            if (localPoint.y - size.y < canvasRT.rect.yMin)
+                localPoint.y = localPoint.y - offset.y + size.y;
 
             // clamp à l’écran pour pivot 0,1 (haut-gauche)
             var min = new Vector2(canvasRT.rect.xMin, canvasRT.rect.yMin + size.y);
