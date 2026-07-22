@@ -277,8 +277,8 @@ public class GameManager : MonoBehaviour
     private readonly HashSet<int> frozenLocks = new();
     private readonly HashSet<int> mutableLocks = new();
     private readonly HashSet<int> flashLockIndices = new();
-    // VISUEL UNIQUEMENT : dés d'un Flash non suivis par flashLockIndices — Flash de l'IA
-    // et Flash créé par un artefact. Sert au surlignage orange, n'influence aucune règle.
+    // VISUEL UNIQUEMENT : dés d'un Flash non suivis par flashLockIndices — Flash de l'IA.
+    // Sert au surlignage orange, n'influence aucune règle.
     private readonly HashSet<int> flashVisualIndices = new();
     private readonly Dictionary<int, int> mutablePoints = new();
     private readonly HashSet<int> eligibleLockIndices = new();
@@ -770,7 +770,7 @@ public class GameManager : MonoBehaviour
     // Puis pour remplir l’UI :
     void RefreshHud()
     {
-        palierHudText.text = $"Palier {palierIndex + 1}/{PalierCount()}";
+        palierHudText.text = $"Palier {palierIndex + 1}/{PalierCount()} ({GetWinThresholdForPalier(palierIndex)} pts)";
         tourHudText.text = $"Adversaire {enemyIndex + 1}/{EnemiesPerPalier(palierIndex)}";
     }
 
@@ -1091,8 +1091,10 @@ public class GameManager : MonoBehaviour
         int enemiesThisPalier = GetEnemyCountInPalier(palierIndex);
 
         // ---------- Textes HUD ----------
+        // Le palier affiche aussi le score à atteindre pour le remporter (ex : "Palier 1/5 (300 pts)").
         if (palierHudText)
-            palierHudText.text = $"Palier {Mathf.Clamp(palierIndex + 1, 1, Mathf.Max(1, palierCount))}/{Mathf.Max(1, palierCount)}";
+            palierHudText.text = $"Palier {Mathf.Clamp(palierIndex + 1, 1, Mathf.Max(1, palierCount))}/{Mathf.Max(1, palierCount)}"
+                               + $" ({GetWinThresholdForPalier(palierIndex)} pts)";
 
         if (tourHudText)
             tourHudText.text = $"Adversaire {Mathf.Clamp(enemyIndex + 1, 1, Mathf.Max(1, enemiesThisPalier))}/{Mathf.Max(1, enemiesThisPalier)}";
@@ -1547,12 +1549,17 @@ public class GameManager : MonoBehaviour
     }
 
 
+    // Déverrouillage d'urgence posé par le filet anti-blocage (voir EnsurePlayerHasAnAction).
+    private bool softlockRollOverride = false;
+
     // Vrai si le joueur peut relancer en phase Normal.
     // Miroir exact de la garde dans OnPressRoll : on doit avoir sélectionné un dé marquant
     // (sauf hot-dice où tous les dés scorent et la relance complète est imposée).
     bool CanPlayerRollInNormal()
     {
         if (dice == null || dice.Count == 0) return false;
+
+        if (softlockRollOverride) return true;
 
         // TRAIT Happy Hour terminé : au-delà de 75 pts sur le tour, le joueur DOIT banker
         if (EnemyTraitActive("happyhour") && turnScore > 75) return false;
@@ -1573,8 +1580,40 @@ public class GameManager : MonoBehaviour
         return anyUnlocked || allLocked;
     }
 
+    // Filet anti-blocage : si, au tour du joueur, ni ROLL ni BANK ni NEXT ne sont actifs
+    // ET qu'aucun dé n'est sélectionnable, la partie est figée (aucune action possible).
+    // On répare alors l'état (Flash fantôme) et on rouvre ROLL plutôt que de bloquer le jeu.
+    void EnsurePlayerHasAnAction()
+    {
+        if (currentTurn != Turn.Player) return;
+        if (gameOver || matchOver || isGameOverScreen) return;
+        if (awaitingArtifactPick || awaitingTraitPick || awaitingCounterPlay) return;
+        if (phase != Phase.Normal && phase != Phase.Clause) return;
+        if (onExternalDiePicked != null || extPickActive) return; // un artefact attend une cible
+
+        bool anyButton = (rollButton && rollButton.interactable)
+                      || (bankButton && bankButton.interactable)
+                      || (endRoundButton && endRoundButton.interactable);
+        if (anyButton) return;
+
+        if (eligibleLockIndices.Any(IsDieSelectableNow)) return; // le joueur peut encore cliquer un dé
+
+        if (flashPendingResolution) { ClearClauseState(); clauseClearedBySelection = false; }
+        softlockRollOverride = true;
+        if (rollButton) rollButton.interactable = true;
+
+        uiLog?.Append("Anti-blocage : plus aucune action possible — ROLL réactivé.");
+        ShowAction("Aucun dé sélectionnable — appuie sur ROLL pour relancer.");
+    }
+
     void ApplyButtonsState()
     {
+        PurgeStaleLockSets();
+
+        // Recalcul complet : le déverrouillage d'urgence est réévalué à chaque passage
+        // (il disparaît dès que le joueur retrouve une action normale).
+        softlockRollOverride = false;
+
         // Mode sélection d’artefact OU de trait : le choix se fait en cliquant les cartes,
         // les boutons de jeu sont désactivés.
         if (awaitingArtifactPick || awaitingTraitPick)
@@ -1661,6 +1700,8 @@ public class GameManager : MonoBehaviour
         {
             if (phase == Phase.AITurnWaitEnd && endRoundButton) endRoundButton.interactable = true;
         }
+
+        EnsurePlayerHasAnAction();
     }
 
     // ===== Extern: ciblage de dé pour artefacts =====
@@ -2046,8 +2087,13 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Sinon, comportement normal
-        SetPhase(Phase.WaitEnd);
+        // Sinon : BANK enchaîne directement sur le tour suivant (plus besoin d'appuyer sur Next).
+        // Si la banque a clos le match / la partie, on reste en WaitEnd pour laisser
+        // le joueur appuyer sur CONTINUE (artefacts, progression de campagne).
+        if (gameOver || matchOver || isGameOverScreen) { SetPhase(Phase.WaitEnd); return; }
+
+        ClearScoreModifier();
+        StartNewTurn(Turn.AI);
     }
 
 
@@ -3689,13 +3735,51 @@ public class GameManager : MonoBehaviour
         return eval;
     }
 
+    // Un dé peut-il réellement être cliqué pour être sélectionné ?
+    // Doit rester le MIROIR exact des gardes de OnDieClicked : sans ça, un dé annoncé
+    // « marquant » mais refusé au clic grise ROLL/BANK/NEXT et fige la partie.
+    bool IsDieSelectableNow(int idx)
+    {
+        if (dice == null || idx < 0 || idx >= dice.Count) return false;
+        var d = dice[idx];
+        if (d == null || d.isLocked) return false;
+        if (flashLockIndices.Contains(idx)) return false;
+        if (frozenLocks.Contains(idx) && !mutableLocks.Contains(idx)) return false;
+        return true;
+    }
+
+    // Les ensembles de verrous peuvent contenir des index périmés quand un artefact
+    // déverrouille/transforme des dés (Fortifiant, Miroir, Corne…). On les resynchronise
+    // sur l'état réel des dés avant tout calcul d'éligibilité ou de boutons.
+    void PurgeStaleLockSets()
+    {
+        if (dice == null) return;
+
+        bool Stale(int i) => i < 0 || i >= dice.Count || dice[i] == null || !dice[i].isLocked;
+
+        frozenLocks.RemoveWhere(Stale);
+        flashLockIndices.RemoveWhere(Stale);
+        foreach (var i in mutableLocks.Where(Stale).ToList())
+        {
+            mutableLocks.Remove(i);
+            // Le dé n'est plus verrouillé : ses points ne font plus partie du tour.
+            if (mutablePoints.TryGetValue(i, out int pts)) { turnScore = Mathf.Max(0, turnScore - pts); mutablePoints.Remove(i); }
+        }
+    }
+
     void FillEligibleFromIndices(List<int> indices)
     {
+        PurgeStaleLockSets();
+
         eligibleLockIndices.Clear();
         eligibleLockPoints.Clear();
 
+        // On ne retient que les dés réellement cliquables : « éligible » doit impliquer
+        // « sélectionnable », sinon les boutons se grisent sans aucune action possible.
+        var pickable = indices.Where(IsDieSelectableNow).ToList();
+
         var counts = new Dictionary<DieFace, int>();
-        foreach (var idx in indices)
+        foreach (var idx in pickable)
         {
             var f = dice[idx].GetFace();
             if (f == DieFace.Sun) continue;
@@ -3704,7 +3788,7 @@ public class GameManager : MonoBehaviour
         }
         bool pairExists = counts.Values.Any(v => v >= 2);
 
-        foreach (var idx in indices)
+        foreach (var idx in pickable)
         {
             var f = dice[idx].GetFace();
             if (f == DieFace.Five) { eligibleLockIndices.Add(idx); eligibleLockPoints[idx] = 5; }
@@ -3716,7 +3800,8 @@ public class GameManager : MonoBehaviour
     bool HasAvailableMarkingSingles(out Dictionary<int, int> map)
     {
         map = new Dictionary<int, int>();
-        var unlocked = dice.Select((d, i) => (d, i)).Where(t => t.d != null && !t.d.isLocked).Select(t => t.i).ToList();
+        // Même filtre que FillEligibleFromIndices : seuls les dés réellement cliquables comptent.
+        var unlocked = Enumerable.Range(0, dice?.Count ?? 0).Where(IsDieSelectableNow).ToList();
 
         var counts = new Dictionary<DieFace, int>();
         foreach (var idx in unlocked)
@@ -4600,10 +4685,18 @@ public class GameManager : MonoBehaviour
         if (phase == Phase.WaitEnd) RestoreWimpoutScoreIfAny();
 
         // 1) lock des 3 dés + points du FLASH
+        //    Les index sont enregistrés dans flashLockIndices/frozenLocks comme pour un Flash
+        //    « naturel » : sans ça le jeu considérait ces dés comme libres alors qu'ils sont
+        //    verrouillés, et l'état incohérent finissait par bloquer la sélection.
         foreach (var i in tripleIndices)
             if (i >= 0 && i < dice.Count && dice[i] != null)
             {
                 dice[i].SetLocked(true);
+                // Un dé sélectionné qui rejoint le Flash cède ses points de single au Flash.
+                if (mutableLocks.Remove(i) && mutablePoints.TryGetValue(i, out int single))
+                { turnScore = Mathf.Max(0, turnScore - single); mutablePoints.Remove(i); }
+                frozenLocks.Add(i);
+                flashLockIndices.Add(i);
                 flashVisualIndices.Add(i); // surlignage orange
             }
 
@@ -4644,6 +4737,10 @@ public class GameManager : MonoBehaviour
 
     public void Artifacts_ReevaluateAfterDiceChanged(string banner = null)
     {
+        // Un artefact vient de déverrouiller/transformer des dés : on resynchronise d'abord
+        // les ensembles de verrous, sinon un index périmé rend un dé « marquant » incliquable.
+        PurgeStaleLockSets();
+
         // Recalcule ce qui est sélectionnable parmi les dés NON verrouillés
         var unlocked = dice.Select((d, i) => (d, i))
                         .Where(t => t.d != null && !t.d.isLocked)
@@ -4676,8 +4773,18 @@ public class GameManager : MonoBehaviour
             RestoreWimpoutScoreIfAny();
             if (turnScore > 0)
                 ShowAction($"Tour sauvé ! Score restauré ({turnScore} pts) — sélectionne un dé marquant.");
-            SetPhase(Phase.Normal);
+            // Un Flash reste à dégager → c'est une Clause, pas une phase Normale : en Normal
+            // le Flash en attente grise BANK, ROLL et NEXT en même temps (partie figée).
+            SetPhase(flashPendingResolution ? Phase.Clause : Phase.Normal);
             if (!string.IsNullOrEmpty(banner)) ShowAction(banner);
+        }
+
+        // Cohérence : un Flash en attente implique la phase Clause (seule phase où ROLL
+        // reste ouvert pour le tenter). Sans ça, l'état Normal + Flash bloque tous les boutons.
+        if (flashPendingResolution && phase == Phase.Normal)
+        {
+            uiLog?.Append("État corrigé : Flash en attente → retour en Clause.");
+            SetPhase(Phase.Clause);
         }
 
         ApplyButtonsState();
