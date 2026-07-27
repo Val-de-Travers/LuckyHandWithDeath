@@ -50,6 +50,9 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     int dragOrigSibling;
     Vector2 dragOrigAnchoredPos;
     Quaternion dragOrigRotation;
+    // Ancres/pivot d'origine : pendant le drag on les recentre pour que la carte suive
+    // exactement la souris (sinon un ancrage non centré crée un décalage énorme).
+    Vector2 dragOrigAnchorMin, dragOrigAnchorMax, dragOrigPivot;
 
     [Header("Drag FX")]
     [Tooltip("Amplitude du balancement (degrés) selon la vitesse horizontale de la souris.")]
@@ -65,6 +68,19 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         dropZone = zone;
         onDroppedOnTable = onDropped;
         dragEnabled = (zone != null);
+    }
+
+    // ==== Drag & drop (mode Sélection) : glisser la carte sur le PERSONNAGE pour la choisir ====
+    [HideInInspector] public bool pickDragEnabled = false;
+    ArtifactDropZone pickZone;
+    System.Action onDroppedOnCharacter;
+
+    // Active le glisser-déposer de CHOIX : déposer la carte sur la zone (le personnage) la sélectionne.
+    public void EnablePickDrag(ArtifactDropZone zone, System.Action onPicked)
+    {
+        pickZone = zone;
+        onDroppedOnCharacter = onPicked;
+        pickDragEnabled = (zone != null);
     }
 
     void Awake()
@@ -212,7 +228,13 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     }
 
     // ==== Drag & drop ====
-    bool CanDrag => dragEnabled && mode == ArtifactCardMode.Inventory && artifact != null;
+    // Inventaire : glisser sur la table (usage). Sélection : glisser sur le personnage (choix).
+    bool CanDrag => artifact != null && (
+        (dragEnabled && mode == ArtifactCardMode.Inventory) ||
+        (pickDragEnabled && mode == ArtifactCardMode.Selection));
+
+    // Zone de dépôt active selon le mode courant.
+    ArtifactDropZone ActiveZone => (mode == ArtifactCardMode.Selection) ? pickZone : dropZone;
 
     public void OnBeginDrag(PointerEventData eventData)
     {
@@ -228,17 +250,27 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         dragOrigSibling = transform.GetSiblingIndex();
         dragOrigAnchoredPos = selfRT.anchoredPosition;
         dragOrigRotation = transform.localRotation;
+        dragOrigAnchorMin = selfRT.anchorMin;
+        dragOrigAnchorMax = selfRT.anchorMax;
+        dragOrigPivot = selfRT.pivot;
 
         if (rootCanvas)
         {
-            transform.SetParent(rootCanvas.transform, true); // sort du layout de l'inventaire
+            transform.SetParent(rootCanvas.transform, true); // sort du layout (inventaire ou choix)
             transform.SetAsLastSibling();                    // au-dessus de tout
         }
+
+        // Recentre ancres + pivot : MoveSelf place la carte via anchoredPosition = point local du
+        // canvas (repère centré). Sans ce recentrage, un ancrage en coin/étiré (layout des cartes
+        // de choix) provoque un décalage énorme et la carte part hors écran.
+        selfRT.anchorMin = selfRT.anchorMax = new Vector2(0.5f, 0.5f);
+        selfRT.pivot = new Vector2(0.5f, 0.5f);
+
         if (cg) cg.blocksRaycasts = false;                   // laisse passer le raycast vers la table
 
         dragging = true;
         swayTargetZ = 0f;
-        if (dropZone) dropZone.SetHighlight(true);
+        if (ActiveZone) ActiveZone.SetHighlight(true);
         MoveSelf(eventData.position);
     }
 
@@ -250,8 +282,9 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         // Balancement : la carte penche à l'opposé du déplacement horizontal (effet "trimbalé").
         swayTargetZ = Mathf.Clamp(-eventData.delta.x * swayPerVelocity, -swayMaxAngle, swayMaxAngle);
 
-        // La table s'illumine uniquement quand la carte est réellement au-dessus.
-        if (dropZone) dropZone.SetHighlight(dropZone.Contains(eventData.position, eventData.pressEventCamera));
+        // La zone s'illumine uniquement quand la carte est réellement au-dessus.
+        var z = ActiveZone;
+        if (z) z.SetHighlight(z.Contains(eventData.position, eventData.pressEventCamera));
     }
 
     public void OnEndDrag(PointerEventData eventData)
@@ -259,33 +292,43 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (!dragging) return;
         dragging = false;
 
-        bool droppedOnTable = CanDrag && dropZone && dropZone.Contains(eventData.position, eventData.pressEventCamera);
+        var zone = ActiveZone;
+        bool droppedOnZone = CanDrag && zone && zone.Contains(eventData.position, eventData.pressEventCamera);
+        bool isPickMode = (mode == ArtifactCardMode.Selection);
 
-        // Remet la carte à sa place d'origine dans l'inventaire (rotation comprise).
+        // Remet la carte à sa place d'origine (ancres/pivot recentrés → restaurés, puis position).
+        var rt = (RectTransform)transform;
         if (dragOrigParent)
         {
             transform.SetParent(dragOrigParent, true);
             transform.SetSiblingIndex(dragOrigSibling);
-            ((RectTransform)transform).anchoredPosition = dragOrigAnchoredPos;
         }
+        rt.anchorMin = dragOrigAnchorMin;
+        rt.anchorMax = dragOrigAnchorMax;
+        rt.pivot = dragOrigPivot;
+        rt.anchoredPosition = dragOrigAnchoredPos;
         transform.localRotation = dragOrigRotation;
         swayTargetZ = 0f;
         if (cg) cg.blocksRaycasts = true;
-        if (dropZone) dropZone.SetHighlight(false);
+        if (zone) zone.SetHighlight(false);
 
-        // Déposé sur la table → on tente l'activation, et l'effet de destruction n'est joué
-        // QUE si l'artefact a réellement été consommé. Un usage refusé (mauvais moment,
-        // aucune cible valide, effet non implémenté…) laisse la carte intacte.
-        if (droppedOnTable)
+        if (!droppedOnZone) return;
+
+        if (isPickMode)
         {
-            // ⚠️ On capture l'image AVANT l'usage : consommer l'artefact re-lie aussitôt
-            // la carte à l'artefact suivant de l'inventaire (sinon l'animation de
-            // destruction afficherait la mauvaise icône).
-            Sprite fxSprite = (icon && icon.sprite) ? icon.sprite : (artifact ? artifact.icon : null);
-
-            bool used = onDroppedOnTable != null && onDroppedOnTable.Invoke();
-            if (used) SpawnDestructionFx(eventData.position, fxSprite);
+            // Déposé sur le personnage → on CHOISIT cet artefact. Le callback détruit toute
+            // l'UI de choix (dont CETTE carte) : on n'accède plus à `this` après l'appel.
+            onDroppedOnCharacter?.Invoke();
+            return;
         }
+
+        // Mode Inventaire : déposé sur la table → on tente l'activation. L'effet de destruction
+        // n'est joué QUE si l'artefact a réellement été consommé (un usage refusé laisse la carte).
+        // ⚠️ On capture l'image AVANT l'usage : consommer l'artefact re-lie aussitôt la carte
+        // à l'artefact suivant (sinon l'animation afficherait la mauvaise icône).
+        Sprite fxSprite = (icon && icon.sprite) ? icon.sprite : (artifact ? artifact.icon : null);
+        bool used = onDroppedOnTable != null && onDroppedOnTable.Invoke();
+        if (used) SpawnDestructionFx(eventData.position, fxSprite);
     }
 
     // Vignette "détruite" (tremblement + rotation + rétrécissement + fondu) à l'endroit du dépôt.

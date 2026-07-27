@@ -127,6 +127,7 @@ public class ArtifactPowers : MonoBehaviour
         // TRAIT Boss "Audit des Morts" : 1×/match, l'artefact joué est annulé et confisqué
         if (gm != null && gm.Boss_TryAuditCancelArtifact())
         {
+            gm.JournalPlayerAction($"« {a.displayName} » confisqué (Audit des Morts)");
             int safeIdx = Mathf.Clamp(index, 0, inventory.Count - 1);
             inventory.RemoveAt(safeIdx);
             inventoryUI?.RefreshNow();
@@ -134,6 +135,9 @@ public class ArtifactPowers : MonoBehaviour
             inventoryUI?.Hide();
             return true; // l'artefact quitte bien l'inventaire : l'animation est justifiée
         }
+
+        // Journal du joueur : nom de l'artefact utilisé (le détail de l'effet est ajouté par l'effet lui-même).
+        gm?.JournalPlayerAction($"Utilise « {a.displayName} »");
 
         // Déclenche l’effet, consomme à la fin
         effect.BeginUse(gm, onConsumed: () =>

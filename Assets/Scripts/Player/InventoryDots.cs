@@ -10,6 +10,10 @@ public class InventoryDots : MonoBehaviour
     public Color emptyColor = new Color(1,1,1,0.25f);
     public Color fullColor = Color.white;
 
+    [Tooltip("Remplit la pile du BAS vers le HAUT : le dernier élément du tableau 'dots' se " +
+             "remplit en premier. Décocher pour revenir au remplissage haut → bas.")]
+    public bool fillFromBottom = true;
+
     void OnEnable()
     {
         if (inventory) inventory.OnChanged += Refresh;
@@ -28,7 +32,9 @@ public class InventoryDots : MonoBehaviour
             var img = dots[i];
             if (!img) continue;
 
-            bool filled = i < count;
+            // Bas → haut : on remplit à partir de la FIN du tableau (le tableau étant ordonné
+            // du haut vers le bas dans la hiérarchie).
+            bool filled = fillFromBottom ? (i >= dots.Length - count) : (i < count);
             if (fullSprite && emptySprite) img.sprite = filled ? fullSprite : emptySprite;
             img.color = filled ? fullColor : emptyColor;
         }
