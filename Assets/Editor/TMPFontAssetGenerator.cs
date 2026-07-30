@@ -18,11 +18,111 @@ public static class TMPFontAssetGenerator
 {
     // Réglages d'atlas. Mode Dynamic : les glyphes sont ajoutés à la demande, donc pas besoin
     // de lister les caractères à l'avance (accents français inclus automatiquement).
-    const int SAMPLING_POINT_SIZE = 90;
-    const int ATLAS_PADDING = 9;
-    const int ATLAS_SIZE = 1024;
+    //
+    // ⚠️ Padding : un padding trop faible par rapport à la taille d'échantillonnage produit des
+    // artefacts SDF — typiquement une « rayure » sous une lettre dont le trait touche le bord de
+    // sa case d'atlas (ex : le C de CLAUSE). On garde un ratio confortable (~18 %) et une taille
+    // d'échantillonnage élevée pour les polices décoratives (Pirata One, IM Fell, Kings…).
+    const int SAMPLING_POINT_SIZE = 100;
+    const int ATLAS_PADDING = 18;
+    const int ATLAS_SIZE = 2048;
 
     const string MENU = "Tools/Cosmic Wimpout/Générer les TMP Font Assets (sélection)";
+    const string MENU_FORCE = "Tools/Cosmic Wimpout/Régénérer les TMP Font Assets (écrase la sélection)";
+    const string MENU_FIX = "Tools/Cosmic Wimpout/Corriger la netteté des Font Assets (in-place, garde le GUID)";
+
+    // Réglages de la correction « in-place » : padding confortable qui supprime les artefacts
+    // SDF (la « rayure » sous certaines lettres) sur les polices à empattements.
+    const int FIX_PADDING = 12;
+    const int FIX_ATLAS = 1024;
+    const float FIX_POINT_SIZE = 90f;
+
+    // Corrige les TMP Font Assets SÉLECTIONNÉS sans changer leur GUID : on augmente le padding
+    // de l'atlas et on vide les glyphes pour qu'ils soient re-rendus proprement (mode Dynamic).
+    // À utiliser sur un asset « … SDF » dont le rendu bave (padding trop faible à la création).
+    [MenuItem(MENU_FIX)]
+    static void FixSelectedFontAssets()
+    {
+        var assets = new List<TMP_FontAsset>();
+        foreach (var obj in Selection.objects)
+        {
+            var fa = obj as TMP_FontAsset;
+            if (fa != null && !assets.Contains(fa)) assets.Add(fa);
+        }
+
+        if (assets.Count == 0)
+        {
+            EditorUtility.DisplayDialog(
+                "Aucun Font Asset sélectionné",
+                "Sélectionne dans le Project un ou plusieurs TMP Font Assets « … SDF » " +
+                "(pas le .ttf), puis relance la commande.",
+                "OK");
+            return;
+        }
+
+        int fixedCount = 0;
+        foreach (var fa in assets)
+            if (RebuildFontAssetInPlace(fa)) fixedCount++;
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log($"[TMP Font Assets] {fixedCount} Font Asset(s) corrigé(s) (padding {FIX_PADDING}). " +
+                  "Le GUID est conservé : aucune référence à réassigner. " +
+                  "Si un texte reste flou, rouvre la scène pour forcer le re-rendu de l'atlas.");
+    }
+
+    // Reconstruit l'atlas d'un Font Asset EXISTANT en place (même objet, même GUID) :
+    // vide les glyphes générés avec un padding trop faible, remonte le padding / la taille
+    // d'atlas / la taille d'échantillonnage, et remet le material cohérent (gradient scale).
+    static bool RebuildFontAssetInPlace(TMP_FontAsset fa)
+    {
+        if (fa == null) return false;
+
+        // 1) Vider glyphes + atlas (générés avec l'ancien padding).
+        fa.ClearFontAssetData(true);
+
+        // 2) Régler padding / atlas / point size / mode dynamique via SerializedObject
+        //    (les setters publics n'existent pas tous ; on édite les champs sérialisés).
+        var so = new SerializedObject(fa);
+        SetInt(so, "m_AtlasPadding", FIX_PADDING);
+        SetInt(so, "m_AtlasWidth", FIX_ATLAS);
+        SetInt(so, "m_AtlasHeight", FIX_ATLAS);
+        SetInt(so, "m_AtlasPopulationMode", 1); // 1 = Dynamic : l'atlas se régénère à la demande
+        var ps = so.FindProperty("m_FaceInfo.m_PointSize");
+        if (ps != null && ps.propertyType == SerializedPropertyType.Float) ps.floatValue = FIX_POINT_SIZE;
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        // 3) Material : gradient scale = padding + 1, dimensions d'atlas cohérentes.
+        var mat = fa.material;
+        if (mat != null)
+        {
+            mat.SetFloat(ShaderUtilities.ID_GradientScale, FIX_PADDING + 1);
+            mat.SetFloat(ShaderUtilities.ID_TextureWidth, FIX_ATLAS);
+            mat.SetFloat(ShaderUtilities.ID_TextureHeight, FIX_ATLAS);
+            EditorUtility.SetDirty(mat);
+        }
+
+        EditorUtility.SetDirty(fa);
+        Debug.Log($"[TMP Font Assets] Corrigé en place : {AssetDatabase.GetAssetPath(fa)}", fa);
+        return true;
+    }
+
+    static void SetInt(SerializedObject so, string propertyPath, int value)
+    {
+        var p = so.FindProperty(propertyPath);
+        if (p != null) p.intValue = value;
+    }
+
+    // Écrase les assets déjà générés (utile après avoir changé padding / taille d'atlas).
+    static bool _overwrite = false;
+
+    [MenuItem(MENU_FORCE)]
+    static void RegenerateFromSelection()
+    {
+        _overwrite = true;
+        try { GenerateFromSelection(); }
+        finally { _overwrite = false; }
+    }
 
     [MenuItem(MENU)]
     static void GenerateFromSelection()
@@ -112,11 +212,17 @@ public static class TMPFontAssetGenerator
         string assetName = Path.GetFileNameWithoutExtension(fontPath) + " SDF";
         string outPath = $"{dir}/{assetName}.asset";
 
-        // On ne réécrit pas un asset déjà généré (évite de casser les références existantes).
+        // Par défaut on ne réécrit pas un asset déjà généré (évite de casser les références).
+        // Le menu « Régénérer (écrase) » force la réécriture après un changement de réglages.
         if (AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(outPath) != null)
         {
-            Debug.Log($"[TMP Font Assets] Déjà présent, ignoré : {outPath}");
-            return false;
+            if (!_overwrite)
+            {
+                Debug.Log($"[TMP Font Assets] Déjà présent, ignoré : {outPath} " +
+                          "(utilise « Régénérer (écrase) » pour le refaire).");
+                return false;
+            }
+            AssetDatabase.DeleteAsset(outPath);
         }
 
         var fontAsset = TMP_FontAsset.CreateFontAsset(

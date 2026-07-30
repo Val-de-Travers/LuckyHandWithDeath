@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: f6bd0815b3c25f24eb21f0dc1cfbbff7
+guid: c507c8b432d17f147972fb6da020b10c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3178993981933596611
-    second: portrait_death_0
+      213: 437081323311004602
+    second: portrait_death 1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,29 +96,16 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: portrait_death_0
+      name: portrait_death 1_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 448
+        width: 449
         height: 452
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3cfa14cfe2e0e1c20800000000000000
-      internalID: 3178993981933596611
+      spriteID: abbf8e5d523d01600800000000000000
+      internalID: 437081323311004602
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      portrait_death_0: 3178993981933596611
+      portrait_death 1_0: 437081323311004602
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

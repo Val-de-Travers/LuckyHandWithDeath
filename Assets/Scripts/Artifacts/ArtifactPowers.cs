@@ -80,15 +80,9 @@ public class ArtifactPowers : MonoBehaviour
     // Resolve paresseux (safe sur toutes versions Unity)
     void EnsureRefs()
     {
-#if UNITY_2023_1_OR_NEWER
-        if (!gm)        gm        = FindFirstObjectByType<GameManager>(FindObjectsInactive.Include);
-        if (!inventory) inventory = FindFirstObjectByType<PlayerInventory>(FindObjectsInactive.Include);
-        if (!inventoryUI) inventoryUI = FindFirstObjectByType<InventoryUI>(FindObjectsInactive.Include);
-#else
-        if (!gm) gm = FindObjectOfType<GameManager>(true);
-        if (!inventory) inventory = FindObjectOfType<PlayerInventory>(true);
-        if (!inventoryUI) inventoryUI = FindObjectOfType<InventoryUI>(true);
-#endif
+        if (!gm)        gm        = FindAnyObjectByType<GameManager>(FindObjectsInactive.Include);
+        if (!inventory) inventory = FindAnyObjectByType<PlayerInventory>(FindObjectsInactive.Include);
+        if (!inventoryUI) inventoryUI = FindAnyObjectByType<InventoryUI>(FindObjectsInactive.Include);
     }
 
     // Appelée par l’UI (drag & drop sur la table) via GameManager.TryUseArtifactFromInventory(...)

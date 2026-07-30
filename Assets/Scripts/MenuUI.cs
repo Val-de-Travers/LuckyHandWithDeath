@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 #if TMP_PRESENT || TEXTMESHPRO_PRESENT
@@ -36,12 +37,31 @@ public class MenuUI : MonoBehaviour
     [Tooltip("Mode d'affichage : Plein écran, Plein écran fenêtré, Fenêtré (options remplies en code).")]
     [SerializeField] private TMPro.TMP_Dropdown displayModeDropdown;
 
+    [Header("Options — Raccourcis")]
+    [Tooltip("Bouton cliquable qui affiche/reconfigure la touche du bouton d'action 'Relancer'.")]
+    [SerializeField] private Button rollKeyButton;
+    [SerializeField] private Button bankKeyButton;
+    [Tooltip("Bouton du raccourci 'Next' (= Terminer le tour).")]
+    [SerializeField] private Button nextKeyButton;
+    [Tooltip("Libellés affichant la lettre de la touche (enfants des boutons ci-dessus).")]
+    [SerializeField] private TMPro.TMP_Text rollKeyLabel;
+    [SerializeField] private TMPro.TMP_Text bankKeyLabel;
+    [SerializeField] private TMPro.TMP_Text nextKeyLabel;
+
+    [Header("Options — Langue")]
+    [Tooltip("Liste des langues. Pour l'instant purement indicatif (la bascule viendra plus tard).")]
+    [SerializeField] private TMPro.TMP_Dropdown languageDropdown;
+
     [Header("Scene")]
     [SerializeField] private string gameSceneName = "GameScene";
 
     const string PREF_FULLSCREEN = "pref_fullscreen";     // ancien réglage (migration)
     const string PREF_DISPLAY_MODE = "pref_display_mode"; // 0 plein écran, 1 plein écran fenêtré, 2 fenêtré
     const string PREF_RESOLUTION = "pref_resolution";     // "largeurxhauteur"
+    const string PREF_LANGUAGE = "pref_language";         // 0 Français, 1 English
+
+    // Reconfiguration d'un raccourci en cours (null = aucune écoute).
+    GameAction? listeningAction = null;
 
     // Ordre des entrées du dropdown de mode d'affichage
     static readonly FullScreenMode[] DisplayModes =
@@ -72,10 +92,26 @@ public class MenuUI : MonoBehaviour
         SetupDisplayModeDropdown();
         SetupResolutionDropdown();
         SetupVolumeSliders();
+        SetupShortcuts();
+        SetupLanguageDropdown();
     }
 
     void Update()
     {
+        // ----- Reconfiguration d'un raccourci : on capture la prochaine touche.
+        if (listeningAction.HasValue)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var lkb = Keyboard.current;
+            if (lkb != null && lkb.escapeKey.wasPressedThisFrame) { CancelRebind(); return; }
+#else
+            if (Input.GetKeyDown(KeyCode.Escape)) { CancelRebind(); return; }
+#endif
+            if (KeyBindings.TryCapture(out KeyCode captured))
+                CompleteRebind(captured);
+            return; // pendant l'écoute, on ignore les autres raccourcis
+        }
+
         // ----- Clavier (Escape pour fermer, F11 pour basculer plein écran)
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
@@ -215,6 +251,95 @@ public class MenuUI : MonoBehaviour
     void ToggleSettings(bool show)
     {
         if (settingsPanel) settingsPanel.gameObject.SetActive(show);
+        if (!show && listeningAction.HasValue) CancelRebind(); // fermeture pendant une écoute
+    }
+
+    // ===================== OPTIONS : RACCOURCIS =====================
+
+    void SetupShortcuts()
+    {
+        if (rollKeyButton) rollKeyButton.onClick.AddListener(() => BeginRebind(GameAction.Roll));
+        if (bankKeyButton) bankKeyButton.onClick.AddListener(() => BeginRebind(GameAction.Bank));
+        if (nextKeyButton) nextKeyButton.onClick.AddListener(() => BeginRebind(GameAction.EndRound));
+        RefreshShortcutLabels();
+    }
+
+    void RefreshShortcutLabels()
+    {
+        // On ne réécrit pas le libellé en cours d'écoute (il doit rester vide).
+        if (rollKeyLabel && !(listeningAction == GameAction.Roll))
+            rollKeyLabel.text = KeyBindings.Label(KeyBindings.Get(GameAction.Roll));
+        if (bankKeyLabel && !(listeningAction == GameAction.Bank))
+            bankKeyLabel.text = KeyBindings.Label(KeyBindings.Get(GameAction.Bank));
+        if (nextKeyLabel && !(listeningAction == GameAction.EndRound))
+            nextKeyLabel.text = KeyBindings.Label(KeyBindings.Get(GameAction.EndRound));
+    }
+
+    Button ButtonFor(GameAction a) =>
+        a == GameAction.Roll ? rollKeyButton :
+        a == GameAction.Bank ? bankKeyButton : nextKeyButton;
+
+    TMPro.TMP_Text LabelFor(GameAction a) =>
+        a == GameAction.Roll ? rollKeyLabel :
+        a == GameAction.Bank ? bankKeyLabel : nextKeyLabel;
+
+    void BeginRebind(GameAction a)
+    {
+        if (listeningAction.HasValue) CancelRebind(); // on relâche une écoute précédente
+
+        listeningAction = a;
+
+        var lbl = LabelFor(a);
+        if (lbl) lbl.text = "";                 // la lettre disparaît
+        var btn = ButtonFor(a);
+        if (btn) btn.interactable = false;      // le bouton devient grisé
+
+        // Évite que la touche pressée ne « valide » le bouton encore sélectionné.
+        if (EventSystem.current) EventSystem.current.SetSelectedGameObject(null);
+    }
+
+    void CancelRebind()
+    {
+        if (!listeningAction.HasValue) return;
+        var btn = ButtonFor(listeningAction.Value);
+        if (btn) btn.interactable = true;
+        listeningAction = null;
+        RefreshShortcutLabels();
+    }
+
+    void CompleteRebind(KeyCode key)
+    {
+        if (!listeningAction.HasValue) return;
+        var a = listeningAction.Value;
+        var btn = ButtonFor(a);
+        if (btn) btn.interactable = true;
+        listeningAction = null;
+
+        KeyBindings.Set(a, key);        // peut échanger avec une autre action en cas de conflit
+        RefreshShortcutLabels();        // met à jour les trois libellés
+    }
+
+    // ===================== OPTIONS : LANGUE =====================
+
+    void SetupLanguageDropdown()
+    {
+        if (!languageDropdown) return;
+
+        languageDropdown.ClearOptions();
+        languageDropdown.AddOptions(new System.Collections.Generic.List<string> { "Français", "English" });
+
+        int saved = Mathf.Clamp(PlayerPrefs.GetInt(PREF_LANGUAGE, 0), 0, 1);
+        languageDropdown.SetValueWithoutNotify(saved);
+        languageDropdown.RefreshShownValue();
+        languageDropdown.onValueChanged.AddListener(OnLanguageChanged);
+    }
+
+    void OnLanguageChanged(int index)
+    {
+        // Pour l'instant on mémorise seulement le choix ; la bascule de langue
+        // effective sera implémentée plus tard.
+        PlayerPrefs.SetInt(PREF_LANGUAGE, index);
+        PlayerPrefs.Save();
     }
 
     // ===================== OPTIONS : MODE D'AFFICHAGE =====================

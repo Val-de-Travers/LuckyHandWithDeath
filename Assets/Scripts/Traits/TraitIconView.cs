@@ -28,7 +28,8 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         tooltip = sharedTooltip;
 
         string title = used ? $"(utilisé) {traitName}" : traitName;
-        tipText = string.IsNullOrEmpty(description) ? title : $"{title}\n{description}";
+        // Titre en gras dans le tooltip (cohérent avec les autres survols de traits).
+        tipText = string.IsNullOrEmpty(description) ? $"<b>{title}</b>" : $"<b>{title}</b>\n{description}";
 
         bool faded = used || dimmed;
 

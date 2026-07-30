@@ -169,7 +169,8 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public void BindRaw(string title, string desc, Sprite iconSprite = null, string typeText = "Trait")
     {
         artifact = null;
-        rawTooltip = desc;
+        // Titre en gras dans le tooltip (cohérent avec les autres survols de traits).
+        rawTooltip = string.IsNullOrEmpty(desc) ? $"<b>{title}</b>" : $"<b>{title}</b>\n{desc}";
 
         if (icon)
         {

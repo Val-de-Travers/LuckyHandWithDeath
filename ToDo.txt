@@ -1,14 +1,8 @@
 A FAIRE 
 ----------------------------------------------
 
-- Mise en place des Afflixions
-
-- Fait que les adversaires peuvent posséder et utiliser des artefacts
-
-- Mettre le fait de gagner un artefact entre chaque victoire ET défaite
-( Avoir le choix entre 1 ou 2 artefact si c'est une défaite ? )
 ( Passé le palier 3, si il y a victoire, avoir 2 tableaux de choix d'artefact DONC gagner 2 artefacts ? )
-
+- Faire le menu avec les onglets (Nouvelle partie - Options - Quitter)
 
 
 - Enlever le (doit ouvrir 35) des panneaux de score de joueur et le spécifier autrement (cadenas sur tableau des scores ?)
@@ -21,7 +15,8 @@ A FAIRE
 
 IDEES
 ----------------------------------------------
-A la fin d'un palier, le joueur à le choix d'assimilés une des afflictions des adversaires battus.
+Faire un panneau des régles cliquable 
+Si 3 artefacts d'une meme type dans l'inventaire, débloque un trait spécial
 
 
 
