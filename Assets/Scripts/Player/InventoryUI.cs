@@ -84,10 +84,22 @@ public class InventoryUI : MonoBehaviour
         {
             panel.gameObject.SetActive(true);
             panel.SetAsLastSibling();
+            EnsureOnTop();
         }
         ClampIndex();
         RefreshCard();
         gameManager?.OnInventoryOpenChanged(IsOpen); // met à jour le bouton Destroy
+    }
+
+    // L'inventaire ouvert doit rendre AU-DESSUS de tout (y compris un voile de tutoriel).
+    // On lui donne son propre Canvas à tri élevé (créé une seule fois).
+    void EnsureOnTop()
+    {
+        var c = panel.GetComponent<Canvas>();
+        if (!c) c = panel.gameObject.AddComponent<Canvas>();
+        c.overrideSorting = true;
+        c.sortingOrder = 30000;
+        if (!panel.GetComponent<GraphicRaycaster>()) panel.gameObject.AddComponent<GraphicRaycaster>();
     }
 
     public void Hide()

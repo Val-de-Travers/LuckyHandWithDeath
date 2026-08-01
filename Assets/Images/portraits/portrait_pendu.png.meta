@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ca371a66dac716642a11efc6e351c591
+guid: e3e081e6093506c429600ba02c4b8969
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3657348073803524614
-    second: portrait_pendu_0
+      213: 3534490129180992306
+    second: portrait_pendu 1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,29 +96,16 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: portrait_pendu_0
+      name: portrait_pendu 1_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 448
+        width: 451
         height: 452
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 60aa40712b281c230800000000000000
-      internalID: 3657348073803524614
+      spriteID: 23325f3cb080d0130800000000000000
+      internalID: 3534490129180992306
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      portrait_pendu_0: 3657348073803524614
+      portrait_pendu 1_0: 3534490129180992306
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

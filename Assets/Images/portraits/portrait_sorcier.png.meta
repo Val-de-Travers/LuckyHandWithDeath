@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 3a238cf1cc555de40b2c9407117b042e
+guid: 5b8acf489d18b284bb7661e4bcbef4fe
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2446574473389622897
-    second: portrait_sorcier_0
+      213: -6768389568577430751
+    second: portrait_sorcier 1_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,24 +96,11 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: portrait_sorcier_0
+      name: portrait_sorcier 1_0
       rect:
         serializedVersion: 2
         x: 0
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 1764de2658af3f120800000000000000
-      internalID: 2446574473389622897
+      spriteID: 12b9b7f3c89d112a0800000000000000
+      internalID: -6768389568577430751
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      portrait_sorcier_0: 2446574473389622897
+      portrait_sorcier 1_0: -6768389568577430751
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

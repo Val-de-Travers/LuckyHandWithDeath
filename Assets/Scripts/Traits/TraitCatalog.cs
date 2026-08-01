@@ -45,6 +45,9 @@ public static class TraitCatalog
             "Si les 2 joueurs ont le même score, l'adversaire vous cède 20% de son score actuel."),
         new TraitDef("player.resurrection", "Résurrection",
             "À 3 défaites, lancez le dé SUN : sur 5, 10 ou SUN, vous rejouez la partie perdue."),
+        // ⚠️ Effet non encore branché dans la mécanique — défini pour le tutoriel (3e option).
+        new TraitDef("player.horseshoe",    "Fer à Cheval",
+            "1×/match : après un jet sans dé marquant, relancez gratuitement une fois."),
     };
 
     // ===== Clés attendues pour les traits ENNEMIS (champ afflictionKey des assets) =====

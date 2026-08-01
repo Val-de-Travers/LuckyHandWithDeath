@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: fortifying
   displayName: "Fortifiant d\u2019apothicaire"
-  description: "+1 sur un d\xE9 selon l\u2019ordre 2 < 3 < 4 < 5 < 6 < 10"
+  description: "+1 sur la valeur d'un d\xE9 selon l\u2019ordre 2 > 3 > 4 > 5 > 6
+    > 10"
   icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   rarity: 0
   type: 2
