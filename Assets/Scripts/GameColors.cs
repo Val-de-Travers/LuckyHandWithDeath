@@ -8,6 +8,7 @@ public static class GameColors
     // Codes hexa utilisés par le rich text TMP des journaux.
     public const string FlashHex  = "D9B83E"; // jaune  — FLASH
     public const string ClauseHex = "4CE377"; // vert   — CLAUSE
+    public const string FullHex   = "E3902E"; // orange — FULL (ajuste si besoin)
     public const string PointsHex = "E34C4C"; // rouge  — points
 
     // Mêmes couleurs pour l'UI / les contours de dés.

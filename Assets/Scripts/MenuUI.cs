@@ -19,6 +19,7 @@ using UnityEngine.InputSystem;   // Keyboard.current, Gamepad.current, etc.
 public class MenuUI : MonoBehaviour
 {
     [Header("Refs")]
+    [SerializeField] private Button startTutorial;
     [SerializeField] private Button startButton;
     [SerializeField] private Button settingsButton;
     [SerializeField] private RectTransform settingsPanel;
@@ -54,6 +55,7 @@ public class MenuUI : MonoBehaviour
 
     [Header("Scene")]
     [SerializeField] private string gameSceneName = "GameScene";
+    [SerializeField] private string tutorialSceneName = "TutoScene";
 
     const string PREF_FULLSCREEN = "pref_fullscreen";     // ancien réglage (migration)
     const string PREF_DISPLAY_MODE = "pref_display_mode"; // 0 plein écran, 1 plein écran fenêtré, 2 fenêtré
@@ -79,6 +81,7 @@ public class MenuUI : MonoBehaviour
     void Awake()
     {
         if (startButton) startButton.onClick.AddListener(StartGame);
+        if (startTutorial) startTutorial.onClick.AddListener(StartTutorial);
         if (settingsButton) settingsButton.onClick.AddListener(() => ToggleSettings(true));
         if (closeSettingsButton) closeSettingsButton.onClick.AddListener(() => ToggleSettings(false));
         if (quitButton) quitButton.onClick.AddListener(QuitGame);
@@ -145,6 +148,12 @@ public class MenuUI : MonoBehaviour
     {
         if (!string.IsNullOrEmpty(gameSceneName))
             SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+    }
+
+    void StartTutorial()
+    {
+        if (!string.IsNullOrEmpty(tutorialSceneName))
+            SceneManager.LoadScene(tutorialSceneName, LoadSceneMode.Single);
     }
 
     void QuitGame()

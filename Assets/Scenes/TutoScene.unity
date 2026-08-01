@@ -205,87 +205,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8593637}
   m_CullTransparentMesh: 1
---- !u!1 &12487481
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 12487482}
-  - component: {fileID: 12487484}
-  - component: {fileID: 12487483}
-  m_Layer: 5
-  m_Name: Label
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &12487482
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 12487481}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 777460367}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 10, y: 1.2224}
-  m_SizeDelta: {x: -28, y: -3.0301}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &12487483
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 12487481}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 14
-    m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 40
-    m_Alignment: 0
-    m_AlignByGeometry: 0
-    m_RichText: 1
-    m_HorizontalOverflow: 0
-    m_VerticalOverflow: 0
-    m_LineSpacing: 1
-  m_Text: 'On / Off bar time contre-jeu
-
-'
---- !u!222 &12487484
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 12487481}
-  m_CullTransparentMesh: 1
 --- !u!1 &19683707
 GameObject:
   m_ObjectHideFlags: 0
@@ -2386,7 +2305,7 @@ MonoBehaviour:
   devDestroyCurrentArtifactButton: {fileID: 259515468}
   counterPlayTimeout: 3
   counterPlayTimerBar: {fileID: 1985382192}
-  disableCounterPlayToggle: {fileID: 777460368}
+  disableCounterPlayToggle: {fileID: 0}
   playerTraitLibrary: {fileID: 11400000, guid: 4435b0094b1eccf4e81a8c904fd5e031, type: 2}
   bossTraitLibrary: {fileID: 11400000, guid: aaf38237fccbd9e44be96e1c8f8f641d, type: 2}
   playerTraitsIconsRoot: {fileID: 984049099}
@@ -2415,6 +2334,9 @@ MonoBehaviour:
     icon: {fileID: 0}
   - key: player.resurrection
     label: "R\xE9surrection"
+    icon: {fileID: 0}
+  - key: player.horseshoe
+    label: "Fer \xE0 Cheval"
     icon: {fileID: 0}
   aiArtifactIcon: {fileID: 1316114755}
   aiArtifactLabel: {fileID: 1987315543}
@@ -5088,11 +5010,11 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1800298950}
+  m_Father: {fileID: 540455473}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 238.4, y: -54.9}
+  m_AnchoredPosition: {x: 61.50409, y: -42.007782}
   m_SizeDelta: {x: 88.6096, y: 55.8419}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &426601784
@@ -6802,6 +6724,44 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 537724858}
   m_CullTransparentMesh: 1
+--- !u!1 &540455472
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 540455473}
+  m_Layer: 0
+  m_Name: PanoScore
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &540455473
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 540455472}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 691713291}
+  - {fileID: 817251888}
+  - {fileID: 426601783}
+  m_Father: {fileID: 1800298950}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 88.297966, y: -6.396123}
+  m_SizeDelta: {x: 239.99995, y: 72.000015}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &546876559
 GameObject:
   m_ObjectHideFlags: 0
@@ -8658,11 +8618,11 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1800298950}
+  m_Father: {fileID: 540455473}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 29.797989, y: -6.3961163}
+  m_AnchoredPosition: {x: -58.50003, y: 0}
   m_SizeDelta: {x: 123, y: 72}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &691713292
@@ -9736,92 +9696,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 772059122}
   m_CullTransparentMesh: 0
---- !u!1 &777460366
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 777460367}
-  - component: {fileID: 777460368}
-  m_Layer: 5
-  m_Name: Toggle
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &777460367
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 777460366}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1853296686}
-  - {fileID: 12487482}
-  m_Father: {fileID: 1512110168}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 336, y: -510}
-  m_SizeDelta: {x: 207.9398, y: 20}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &777460368
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 777460366}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Toggle
-  m_Navigation:
-    m_Mode: 3
-    m_WrapAround: 0
-    m_SelectOnUp: {fileID: 0}
-    m_SelectOnDown: {fileID: 0}
-    m_SelectOnLeft: {fileID: 0}
-    m_SelectOnRight: {fileID: 0}
-  m_Transition: 1
-  m_Colors:
-    m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
-    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
-    m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
-    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
-    m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
-    m_ColorMultiplier: 1
-    m_FadeDuration: 0.1
-  m_SpriteState:
-    m_HighlightedSprite: {fileID: 0}
-    m_PressedSprite: {fileID: 0}
-    m_SelectedSprite: {fileID: 0}
-    m_DisabledSprite: {fileID: 0}
-  m_AnimationTriggers:
-    m_NormalTrigger: Normal
-    m_HighlightedTrigger: Highlighted
-    m_PressedTrigger: Pressed
-    m_SelectedTrigger: Selected
-    m_DisabledTrigger: Disabled
-  m_Interactable: 1
-  m_TargetGraphic: {fileID: 1853296687}
-  toggleTransition: 1
-  graphic: {fileID: 1053385950}
-  m_Group: {fileID: 0}
-  onValueChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_IsOn: 0
 --- !u!1 &780355165
 GameObject:
   m_ObjectHideFlags: 0
@@ -10398,11 +10272,11 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1800298950}
+  m_Father: {fileID: 540455473}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 146.79794, y: -6.3961287}
+  m_AnchoredPosition: {x: 58.499985, y: 0.000023841858}
   m_SizeDelta: {x: 123, y: 72}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &817251889
@@ -12702,81 +12576,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1051733146}
   m_CullTransparentMesh: 0
---- !u!1 &1053385948
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1053385949}
-  - component: {fileID: 1053385951}
-  - component: {fileID: 1053385950}
-  m_Layer: 5
-  m_Name: Checkmark
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1053385949
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1053385948}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1853296686}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 20, y: 20}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1053385950
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1053385948}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
---- !u!222 &1053385951
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1053385948}
-  m_CullTransparentMesh: 1
 --- !u!1 &1056416857
 GameObject:
   m_ObjectHideFlags: 0
@@ -17270,7 +17069,6 @@ RectTransform:
   - {fileID: 280138216}
   - {fileID: 2144094696}
   - {fileID: 915013101}
-  - {fileID: 777460367}
   - {fileID: 1986475674}
   - {fileID: 639825889}
   - {fileID: 469193299}
@@ -19992,6 +19790,1253 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1747237589}
   m_CullTransparentMesh: 1
+--- !u!1 &1756720538
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1756720540}
+  - component: {fileID: 1756720539}
+  m_Layer: 0
+  m_Name: TutorialManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1756720539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1756720538}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed1d5922e9ce38c46b815600f73ff05f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialManager
+  game: {fileID: 183698589}
+  scoreRoot: {fileID: 0}
+  inventoryButton: {fileID: 0}
+  steps:
+  - title: BIENVENUE
+    text: "Bienvenue ! Dans ce jeu vous incarnerez la mort qui affronte des mourants
+      aux portes de leur mort. Ceux ci on une chance de pouvoir s\u2019en sortir
+      en vous affrontant \xE0 un jeu de d\xE9s Ce tutoriel t'explique le jeu pas
+      \xE0 pas. Clique n'importe o\xF9 pour passer \xE0 l'\xE9tape suivante."
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 6
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright: []
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES DES
+    text: "Le jeu se joue avec cinq d\xE9s particuliers. Les faces de base sont 2,
+      3, 4, 6. Mais ils existent trois autres faces un peu sp\xE9ciales."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 02000000030000000400000006000000
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES FACES SPECIALES QUI MARQUENT
+    text: "Ces faces sp\xE9ciales sont : Le 5 qui rapporte 5 points, le 10 qui en
+      rapporte 10, et le Soleil qui est la face la plus forte."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 050000000a00000064000000
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE SOLEIL
+    text: "Le soleil est une face puissante. De base le soleil vaut 10 points mais
+      il peut \xE9galement remplacer n'importe quelle face pour cr\xE9er des combinaisons."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 64000000
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES COMBINAISONS
+    text: 'Trois faces identiques forment un FLASH : une combinaison qui rapporte
+      gros. Nous verrons les FLASH, la CLAUSE et le FULL en jouant.'
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 060000000600000006000000
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: QUI COMMENCE ? - 1
+    text: "Au d\xE9but de la partie, les 2 joueurs lance un d\xE9 chacun pour d\xE9t\xE9rminer
+      qui jouera en premier. Le chiffre le plus haut gagne. Si les 2 joueurs on les
+      m\xEAmes d\xE9s, pas de probl\xE8me on relance jusqu'\xE0 que l'un des deux
+      l'emporte sur l'autre."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 1
+    setupPhase: 1
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 0500000002000000
+    highlightTarget: {fileID: 451939006}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: QUI COMMENCE ? - 2
+    text: C'est toi qui commence ! Appuie sur NEXT pour commencer ton tour.
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 557744755}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LANCER LES DES
+    text: "Tu commences ! Appuie sur ROLL pour lancer les d\xE9s une premi\xE8re
+      fois."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 2
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 05000000040000000a0000000600000003000000
+    highlightTarget: {fileID: 451939006}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: TON TOUR - 1
+    text: "Avec ces d\xE9s, tu peux s\xE9lectionner une ou plusieurs faces qui marquent
+      des points, s\xE9lectionne au moins un d\xE9s marquant, tu verras les points
+      correspondants apparaitre.\nAppuie sur ROLL pour lancer le reste des d\xE9s
+      que tu n\u2019as pas s\xE9lectionn\xE9."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 1
+    forceNextRoll: 020000000a00000003000000
+    highlightTarget: {fileID: 19683709}
+    keepBright:
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: TON TOUR - 2
+    text: "Voil\xE0 une autre face marquante ! Tu peux donc la s\xE9lectionner et
+      continuer \xE0 jouer.\nAvant chaque ROLL tu dois s\xE9lectionner au moins une
+      face marquante pour lancer les autres d\xE9s et esp\xE9rer marquer plus de
+      points. \nAppuie sur ROLL quand tu auras s\xE9lectionn\xE9 cette face."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0400000064000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: TON TOUR-3
+    text: "Une autre face marquante gr\xE2ce au Soleil. Son score de base est de
+      10 points.\nCela commence a faire quelques points, tu pourrais continuer \xE0
+      ROLL avec ce dernier d\xE9 mais pour le moment il serait de bon ton de s\xE9curiser
+      ce score en appuyant sur BANK."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 1
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: SCORE
+    text: "Ton score est ainsi conserv\xE9 et te voil\xE0 en route pour atteindre
+      l\u2019objectif du score de la partie contre ton adversaire. "
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 540455473}
+    keepBright: []
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: "35 points d\u2019ouverture"
+    text: "A noter que pour pouvoir rentrer dans la partie il faut imp\xE9rativement
+      atteindre au minimum 35 points pour pouvoir marquer davantage de points pour
+      la suite de la partie.\nSi lors de ton tour ce score n\u2019est pas atteint
+      ton tour et ton score sont perdu.\nQuand cela est fait tu pourras BANK du score
+      normalement le reste de la partie"
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 540455473}
+    keepBright:
+    - {fileID: 540455473}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: "TOUR DE L\u2019ADVERSAIRE - 1"
+    text: "Au tour de l\u2019adversaire, il a les m\xEAmes contraintes que toi et
+      lui aussi vise le score de l\u2019objectif de la partie.\nAppuie sur Next pour
+      qu\u2019il puisse jouer."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 1
+    resetDice: 1
+    setupPhase: 9
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 557744755}
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: "TOUR DE L\u2019ADVERSAIRE - 2"
+    text: "3 faces marquante pour lui, il peut continuer \xE0 jouer, \xE0 ses risques
+      et pu\xE9rils.."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 4
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 3
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0a00000005000000050000000200000006000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: "TOUR DE L\u2019ADVERSAIRE - 3"
+    text: "Il n\u2019a eu aucune face marquante avec le lanc\xE9 des 2 autres d\xE9s
+      qui restaient, c\u2019est donc un tour et des points qui sont perdu pour lui.
+      Si une relance ne produit aucune face qui marque, tu perds tous les points
+      non banqu\xE9s du tour. Savoir s'arr\xEAter \xE0 temps est le c\u0153ur du
+      jeu.\nAppuie sur NEXT pour continuer"
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 10
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0400000003000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 557744755}
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE FLASH & LA CLAUSE - 1
+    text: A toi de jouer !
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 2
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0400000004000000040000000200000006000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 451939006}
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE FLASH & LA CLAUSE - 2
+    text: "Tu as un flash de 4 ! Ce qui fait donc 40 points en terme de score. Le
+      FLASH vaut toujours 10x le num\xE9ro du d\xE9 en FLASH. Ce trio de d\xE9s est
+      automatiquement s\xE9lectionn\xE9 car il est obligatoire de prendre en compte
+      et valider un FLASH.\nLa CLAUSE vient de s\u2019enclencher, appuie sur ROLL
+      pour tenter cela sur les 2 autres d\xE9s"
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0a00000003000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 699701202}
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE FLASH & LA CLAUSE - 3
+    text: "La CLAUSE est r\xE9ussit car tu as eu une face marquante !\nTu peux donc
+      BANK ce score ou sinon tu peux ROLL pour esp\xE9rer plus de points.\LPour l\u2019exemple
+      tu vas BANK."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 1
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 699701202}
+    - {fileID: 19683709}
+    - {fileID: 373692236}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LA TOTAL - 1
+    text: "Mais voyons ce qui se passe si tous les d\xE9s sont marqu\xE9s. \nCela
+      comporte son lot de risque aussi..\nLaissons l\u2019adversaire prendre ce risque
+      l\xE0."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 1
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LA TOTAL - 2
+    text: "L\u2019adversaire a fait un jet o\xF9 tous ces d\xE9s sont marquants.\nDans
+      le cas o\xF9 tous les d\xE9s sont s\xE9lectionn\xE9s il est obligatoire de
+      relancer les 5 d\xE9s pour pouvoir continuer \xE0 jouer et m\xEAme BANK son
+      score."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 1
+    setupPhase: 3
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0500000005000000050000000a00000064000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LA TOTAL - 3
+    text: "Heureusement pour lui il a eu une face marquante ce qu\u2019il fait qu\u2019il
+      peut continuer \xE0 jouer. Sinon il aurait perdu tout son score en cours. L\xE0
+      il y a le choix de soit BANK pour s\xE9curiser son score ou de ROLL pour esp\xE9rer
+      plus de points en prenant plus de risque."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 10
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 0200000004000000060000000500000004000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 19683709}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 183698589}
+          m_TargetAssemblyTypeName: GameManager, Assembly-CSharp
+          m_MethodName: Tutorial_AIBank
+          m_Mode: 1
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument: 
+            m_BoolArgument: 0
+          m_CallState: 2
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE JOURNAL D'ACTIONS
+    text: "Au cas o\xF9, tu peux te r\xE9f\xE9rer aux actions de chaque joueur dans
+      leur journal d'action personnel r\xE9p\xE9rtoriant ainsi les derni\xE8res actions
+      du tour."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 763082452}
+    keepBright:
+    - {fileID: 1691410182}
+    - {fileID: 763082452}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LA CAMPAGNE
+    text: "En dehors du tutoriel, tu affrontes une s\xE9rie d'adversaires : c'est
+      le mode campagne, organis\xE9 en paliers de difficult\xE9 croissante.\nAppuie
+      sur le bouton Palier."
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 1
+    requiredAction: 3
+    autoDelay: 2
+    postActionDelay: 0.1
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 1
+    setupPhase: 6
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 1056416858}
+    keepBright:
+    - {fileID: 1056416858}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES PALIERS
+    text: Chaque palier propose 3 nouveaux adversaire. Les vaincre te fait gagner
+      des artefacts par adversaires, des traits de personnage et finalement progresser
+      vers le Boss final.
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 1
+    requiredAction: 6
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 1741068270}
+    keepBright:
+    - {fileID: 2144094696}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES ARTEFACTS - 1
+    text: "Entre chaque adversaire, il te sera donc propos\xE9 3 Artefacts si tu
+      gagnes le duel mais qu\u2019un seul si tu perds. Un Artefact peut modifier
+      la fa\xE7on de jouer le temps d\u2019un tour. Il existe plusieurs types d\u2019Artefact
+      diff\xE9rents : Ajout, Transformation, Relance, Score et Contre-jeu. Voici
+      quelques exemples de chaque type."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 4
+    artifactChoices:
+    - {fileID: 11400000, guid: b5ab76360f14c6a4db2c5b2a947207a0, type: 2}
+    - {fileID: 11400000, guid: e71eb79f14c68934aaf720fa2c18363c, type: 2}
+    - {fileID: 11400000, guid: 394ed3b3aa060654498a5e0cbf35fbe1, type: 2}
+    artifactSelectable: 0
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 1334882702}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES ARTEFACTS - 2
+    text: "Choisis l\u2019un des deux en cliquant dessus ou en le d\xE9pla\xE7ant
+      sur ton personnage \xE0 gauche.\LA savoir que durant la phase de choix il est
+      possible passer cette \xE9tape si aucun Artefact ne vous int\xE9resse o\xF9
+      m\xEAme de d\xE9truire l\u2019un de vos Artefacts en \xE9change d\u2019une
+      vie suppl\xE9mentaire. Nous y reviendrons."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 4
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 4
+    artifactChoices:
+    - {fileID: 11400000, guid: e78486397abe0264aa22a43cc4e12c75, type: 2}
+    - {fileID: 11400000, guid: a338d3e4d735aa042af67069ed2b6469, type: 2}
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 2
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 984049099}
+    - {fileID: 1334882702}
+    - {fileID: 1895578670}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES ARTEFACTS - 3
+    text: "L\u2019Artefact est maintenant bien au chaud dans ton inventaire. \LEssaie
+      le dans cette situation en le glissant sur les d\xE9s !  "
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 1
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 1
+    setupPhase: 7
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 1
+    score: 1
+    forceNextRoll: 05000000050000000a0000000200000003000000
+    highlightTarget: {fileID: 1549280768}
+    keepBright:
+    - {fileID: 1549280768}
+    - {fileID: 303472580}
+    - {fileID: 2108405058}
+    - {fileID: 19683709}
+    - {fileID: 699701202}
+    allowInventory: 1
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES ARTEFACTS - 4
+    text: "Pour ce qui est du type Contre-jeu c\u2019est particulier. Cela te permet
+      de jouer durant le tour de ton adversaire. Lors d\u2019une fen\xEAtre d\u2019action
+      pendant son tour, une barre de temps va apparaitre, si ton inventaire n\u2019est
+      pas ouvert, elle va se r\xE9duire ce qui continuera son tour.\nSi tu ouvres
+      ton inventaire, le temps s\u2019arr\xEAtes et il est possible d\u2019utiliser
+      l\u2019Artefact. Essaie ! "
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 2
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 1
+    resetDice: 0
+    setupPhase: 12
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory:
+    - {fileID: 11400000, guid: e71eb79f14c68934aaf720fa2c18363c, type: 2}
+    showDiceFaces: 
+    hintBanner: 1
+    score: 1
+    forceNextRoll: 0500000005000000050000000200000003000000
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 1549280768}
+    - {fileID: 303472580}
+    - {fileID: 557744755}
+    - {fileID: 1985382191}
+    allowInventory: 1
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES TRAITS - 1
+    text: "Les traits sont des pouvoirs constants ou \xE0 usage unique contre un
+      adversaire pouvant \xEAtre obtenu entre les paliers. Chacun des adversaires
+      que vous affrontez on un trait qui lui ait propre. Si vous arrivez \xE0 battre
+      un ou plusieurs adversaires au court d\u2019un palier, il vous sera proposez
+      leurs trait \xE0 assimiler \xE0 la fin du palier."
+    dialoguePosition: 0
+    disableDim: 0
+    advance: 1
+    requiredAction: 4
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 5
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 1334882702}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 11500000, guid: ed1d5922e9ce38c46b815600f73ff05f, type: 3}
+          m_TargetAssemblyTypeName: UnityEditor.MonoScript, UnityEditor.CoreModule
+          m_MethodName: set_name
+          m_Mode: 5
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument: Tutorial_TraitPickList("player.tax,player.resurrection,boss.tide")
+            m_BoolArgument: 0
+          m_CallState: 2
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES TRAITS - 2
+    text: "Vos traits et ceux de l\u2019adversaire sont consultable \xE0 tous moment
+      \xE0 cot\xE9 de des personnages.\nIl n\u2019est pas possible de les enlever,
+      ils vous suivront tout le long de la partie."
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 984049099}
+    - {fileID: 292912196}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LES ADVERSAIRES
+    text: "Chaque partie est diff\xE9rente car les adversaires que vous allez affronter
+      sont \xE0 chaque fois al\xE9atoire. Plus vous avancerez dans les paliers plus
+      il y a des chances qu\u2019ils aient un Artefact  \xE0 utiliser contre vous. "
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 452965517}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LE BOSS
+    text: "Au 5\xE8me palier, vous affronterez donc le BOSS, qui est s\xFBr d\u2019avoir
+      un artefact voir m\xEAme deux. Qui poss\xE8de son trait de personnage ainsi
+      qu\u2019un trait boss al\xE9atoire qui modifie la partie de fa\xE7on consid\xE9rable."
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 452965517}
+    - {fileID: 292912196}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: LA DEFAITE
+    text: "Vous avez trois vies \xE0 disposition. Si vous arrivez au bout du compte,
+      la partie est perdue.\nMais souvenez vous, en sacrifiant un artefact durant
+      une phase de choix, vous pouvez r\xE9cup\xE9rer une vie."
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright:
+    - {fileID: 280138216}
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  - title: A TOI DE JOUER !
+    text: "Voil\xE0 l'essentiel ! Au besoin tu peux refaire le tuto depuis le menu
+      du jeu et sinon pendant une partie les r\xE8gles sont consultable depuis un
+      bouton en haut \xE0 droite. Bonnes parties !"
+    dialoguePosition: 1
+    disableDim: 0
+    advance: 0
+    requiredAction: 0
+    autoDelay: 2
+    postActionDelay: 0.6
+    hintOverride: 
+    allowedActions: 
+    forceEnableAction: 0
+    resetDice: 0
+    setupPhase: 0
+    artifactChoices: []
+    artifactSelectable: 1
+    giveToInventory: []
+    showDiceFaces: 
+    hintBanner: 0
+    score: 0
+    forceNextRoll: 
+    highlightTarget: {fileID: 0}
+    keepBright: []
+    allowInventory: 0
+    onEnter:
+      m_PersistentCalls:
+        m_Calls: []
+    onExit:
+      m_PersistentCalls:
+        m_Calls: []
+  autoStart: 1
+  startDelay: 0.3
+  dialogueCanvas: {fileID: 0}
+  dialoguePanel: {fileID: 0}
+  titleLabel: {fileID: 0}
+  bodyLabel: {fileID: 0}
+  continueHint: {fileID: 0}
+  inputBlocker: {fileID: 0}
+  highlightFrame: {fileID: 0}
+  titleFont: {fileID: 11400000, guid: 5c94bc544ce90ee44881fdf355379ff0, type: 2}
+  bodyFont: {fileID: 11400000, guid: ed292c379812a6842ad876d748bc0902, type: 2}
+  blockerColor: {r: 0, g: 0, b: 0, a: 0.45}
+  panelColor: {r: 0.10188681, g: 0.10188681, b: 0.10188681, a: 0.96}
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  highlightColor: {r: 0.8901961, g: 0.29803923, b: 0.29803923, a: 0.28}
+  sortingOrder: 5000
+--- !u!4 &1756720540
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1756720538}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1079.5214, y: 562.7587, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1756962374
 GameObject:
   m_ObjectHideFlags: 0
@@ -20397,9 +21442,7 @@ RectTransform:
   m_Children:
   - {fileID: 1549280768}
   - {fileID: 303472580}
-  - {fileID: 691713291}
-  - {fileID: 817251888}
-  - {fileID: 426601783}
+  - {fileID: 540455473}
   - {fileID: 1150195278}
   m_Father: {fileID: 452006346}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -21106,82 +22149,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
---- !u!1 &1853296685
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1853296686}
-  - component: {fileID: 1853296688}
-  - component: {fileID: 1853296687}
-  m_Layer: 5
-  m_Name: Background
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1853296686
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1853296685}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1053385949}
-  m_Father: {fileID: 777460367}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 10, y: -10}
-  m_SizeDelta: {x: 20, y: 20}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1853296687
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1853296685}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 1
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
---- !u!222 &1853296688
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1853296685}
-  m_CullTransparentMesh: 1
 --- !u!1 &1853847190
 GameObject:
   m_ObjectHideFlags: 0
@@ -24568,6 +25535,7 @@ MonoBehaviour:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 1756720540}
   - {fileID: 183698590}
   - {fileID: 519420032}
   - {fileID: 619394802}

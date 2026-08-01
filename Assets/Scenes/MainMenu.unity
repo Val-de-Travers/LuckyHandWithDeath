@@ -1228,6 +1228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1ecfb3247e0c2a4a83eca69b087e7fb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuUI
+  startTutorial: {fileID: 1104729398}
   startButton: {fileID: 1043084010}
   settingsButton: {fileID: 524950934}
   settingsPanel: {fileID: 292211219}
@@ -1245,6 +1246,7 @@ MonoBehaviour:
   nextKeyLabel: {fileID: 1068320307}
   languageDropdown: {fileID: 418716056}
   gameSceneName: SampleScene
+  tutorialSceneName: TutoScene
 --- !u!4 &327676282
 Transform:
   m_ObjectHideFlags: 0

@@ -9,8 +9,10 @@ using ISKey = UnityEngine.InputSystem.Key;
 /// <summary>
 /// Actions de jeu associables à une touche du clavier.
 /// L'ordre sert d'index de stockage : ne pas réordonner.
+/// Seules les 3 premières sont associables à une touche ; PalierCircle sert uniquement
+/// au tutoriel (attendre le clic du bouton de palier), sans raccourci clavier.
 /// </summary>
-public enum GameAction { Roll = 0, Bank = 1, EndRound = 2 }
+public enum GameAction { Roll = 0, Bank = 1, EndRound = 2, PalierCircle = 3, CardPicked = 4, ArtifactPlayed = 5, PalierClose = 6 }
 
 /// <summary>
 /// Raccourcis clavier des boutons d'action, partagés entre le menu (réglages) et
@@ -33,8 +35,12 @@ public static class KeyBindings
             bindings[i] = (KeyCode)PlayerPrefs.GetInt(PrefKeys[i], (int)Defaults[i]);
     }
 
+    // Seules les actions d'index < 3 sont associables à une touche (Roll/Bank/EndRound).
+    static bool IsBindable(GameAction a) => (int)a >= 0 && (int)a < 3;
+
     public static KeyCode Get(GameAction a)
     {
+        if (!IsBindable(a)) return KeyCode.None;
         EnsureLoaded();
         return bindings[(int)a];
     }
@@ -45,6 +51,7 @@ public static class KeyBindings
     /// </summary>
     public static void Set(GameAction a, KeyCode key)
     {
+        if (!IsBindable(a)) return;
         EnsureLoaded();
         int idx = (int)a;
 
