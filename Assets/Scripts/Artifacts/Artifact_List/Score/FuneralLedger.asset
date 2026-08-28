@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: "Livre des comptes fun\xE8bres"
   description: "+50% de points si tu banques au-del\xE0 de 70, sinon -20 points."
   icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
-  rarity: 1
+  rarity: 0
   type: 3
   effectKey: score.funeral_ledger

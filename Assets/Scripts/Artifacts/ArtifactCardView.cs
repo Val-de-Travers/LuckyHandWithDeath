@@ -14,6 +14,7 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public TMP_Text descLabel;     // tu peux le laisser vide si tu veux la desc uniquement en tooltip
     public TMP_Text badgeLabel;    // optionnel : affiche "1", "2", "3" en mode Selection
     public TMP_Text typeLabel;     // affiche le Type de l'artefact (Ajout, Relance, Score, ...)
+    public TMP_Text rarityLabel;   // "Rarete" : affiche le nom de la rareté, coloré selon celle-ci
 
     [Header("Hover FX")]
     public float hoverScale = 1.04f;
@@ -26,6 +27,12 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
 
     [Header("Behavior")]
     public bool showInlineDescriptionInInventory = true;
+
+    [Header("Contour de rareté")]
+    [Tooltip("Épaisseur (px) du cadre coloré indiquant la rareté de l'artefact.")]
+    public float rarityOutlineThickness = 4f;
+    GameObject rarityOutline;
+    Image[] rarityBars;
 
     [HideInInspector] public Artifact artifact;
     [HideInInspector] public ArtifactCardMode mode = ArtifactCardMode.Selection;
@@ -89,6 +96,13 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (!cg) cg = gameObject.AddComponent<CanvasGroup>();
         transform.localScale = Vector3.one * normalScale;
         if (descLabel) descLabel.textWrappingMode = TextWrappingModes.NoWrap;
+
+        // Retrouve le label de rareté ("Rarete") s'il n'est pas assigné dans l'Inspector.
+        if (rarityLabel == null)
+        {
+            var t = transform.Find("Rarete");
+            if (t) rarityLabel = t.GetComponent<TMP_Text>();
+        }
     }
 
     void Update()
@@ -149,6 +163,7 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
             if (nameLabel) nameLabel.text = "—";
             if (typeLabel) typeLabel.text = "";
             if (descLabel && descLabel.gameObject.activeSelf) descLabel.text = "Inventaire vide.";
+            HideRarityOutline();
             return;
         }
 
@@ -162,6 +177,93 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (nameLabel) nameLabel.text = a.displayName;
         if (typeLabel) typeLabel.text = TypeToLabel(a.type);
         if (descLabel && descLabel.gameObject.activeSelf) descLabel.text = a.description;
+
+        ApplyRarity(a.rarity); // label de rareté (coloré) + prépare le contour (affiché au survol)
+    }
+
+    // ==== Rareté : couleur + nom (Common vert · Rare bleu · Epic jaune · Legendary rouge) ====
+    public static Color RarityColor(ArtifactRarity r) => r switch
+    {
+        ArtifactRarity.Common    => new Color(0x4C / 255f, 0xE3 / 255f, 0x77 / 255f), // #4CE377
+        ArtifactRarity.Rare      => new Color(0x4C / 255f, 0x90 / 255f, 0xE3 / 255f), // #4C90E3
+        ArtifactRarity.Epic      => new Color(0xD9 / 255f, 0xB8 / 255f, 0x3E / 255f), // #D9B83E
+        ArtifactRarity.Legendary => new Color(0xE3 / 255f, 0x4C / 255f, 0x4C / 255f), // #E34C4C
+        _ => Color.white
+    };
+
+    public static string RarityName(ArtifactRarity r) => r switch
+    {
+        ArtifactRarity.Common    => "Commun",
+        ArtifactRarity.Rare      => "Rare",
+        ArtifactRarity.Epic      => "Épique",
+        ArtifactRarity.Legendary => "Légendaire",
+        _ => r.ToString()
+    };
+
+    bool hasRarity; // un artefact est lié → le contour peut s'afficher au survol
+
+    void ApplyRarity(ArtifactRarity r)
+    {
+        var c = RarityColor(r);
+
+        // 1) Label "Rarete" : texte + couleur de la rareté.
+        if (rarityLabel)
+        {
+            rarityLabel.text = RarityName(r);
+            rarityLabel.color = c;
+            rarityLabel.gameObject.SetActive(true);
+        }
+
+        // 2) Contour : on prépare/colore les barres, mais on ne l'affiche qu'au survol (voir RefreshOutline).
+        if (rarityOutline == null) BuildRarityOutline();
+        if (rarityBars != null) foreach (var b in rarityBars) if (b) b.color = c;
+        hasRarity = true;
+        RefreshOutline();
+    }
+
+    // Le contour n'apparaît qu'au survol, uniquement en mode Sélection (jamais dans l'inventaire).
+    void RefreshOutline()
+    {
+        if (rarityOutline)
+            rarityOutline.SetActive(hasRarity && isHover && mode == ArtifactCardMode.Selection);
+    }
+
+    void HideRarityOutline()
+    {
+        hasRarity = false;
+        if (rarityOutline) rarityOutline.SetActive(false);
+        if (rarityLabel) { rarityLabel.text = ""; rarityLabel.gameObject.SetActive(false); }
+    }
+
+    void BuildRarityOutline()
+    {
+        rarityOutline = new GameObject("RarityOutline", typeof(RectTransform));
+        var rt = (RectTransform)rarityOutline.transform;
+        rt.SetParent(transform, false);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        // Premier enfant : le cadre rend AU-DESSUS du fond de carte mais DERRIÈRE les labels
+        // (Name, Type, Rarete...) — sinon la barre du haut recouvrait le Name.
+        rarityOutline.transform.SetAsFirstSibling();
+
+        float t = Mathf.Max(1f, rarityOutlineThickness);
+        rarityBars = new Image[4];
+        rarityBars[0] = MakeBar(rt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, t)); // haut
+        rarityBars[1] = MakeBar(rt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, t)); // bas
+        rarityBars[2] = MakeBar(rt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(t, 0f)); // gauche
+        rarityBars[3] = MakeBar(rt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(t, 0f)); // droite
+    }
+
+    static Image MakeBar(RectTransform parent, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 size)
+    {
+        var bar = new GameObject("Bar", typeof(RectTransform));
+        var rt = (RectTransform)bar.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = aMin; rt.anchorMax = aMax; rt.pivot = pivot;
+        rt.sizeDelta = size; rt.anchoredPosition = Vector2.zero;
+        var img = bar.AddComponent<Image>();
+        img.raycastTarget = false;
+        return img;
     }
 
     // Affiche un contenu "libre" (ex: un Trait) sur la carte, sans Artifact sous-jacent.
@@ -182,6 +284,8 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
         if (nameLabel) nameLabel.text = title;
         if (typeLabel) typeLabel.text = typeText;
         if (descLabel && descLabel.gameObject.activeSelf) descLabel.text = desc;
+
+        HideRarityOutline(); // un contenu brut (Trait) n'a pas de rareté
     }
 
     static string TypeToLabel(ArtifactType t) => t switch
@@ -198,6 +302,7 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public void OnPointerEnter(PointerEventData eventData)
     {
         isHover = true;
+        RefreshOutline(); // le contour de rareté n'apparaît qu'au survol
         string tip = artifact != null ? artifact.description : rawTooltip;
         if (tooltip != null && !string.IsNullOrEmpty(tip))
         {
@@ -217,6 +322,7 @@ public class ArtifactCardView : MonoBehaviour, IPointerEnterHandler, IPointerExi
     public void OnPointerExit(PointerEventData eventData)
     {
         isHover = false;
+        RefreshOutline(); // masque le contour de rareté quand on quitte la carte
         if (tooltip != null) tooltip.Hide();
     }
 

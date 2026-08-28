@@ -25,6 +25,8 @@ public class GameManager : MonoBehaviour
     int palierIndex = 0;
     int enemyIndex = 0;
     int defeatsCount = 0;
+    // Chemin boisé : le prochain match perdu est concédé SANS perte de vie (une seule fois).
+    bool concedeNoLifeLoss = false;
     bool awaitingNextMatch = false;             // devient true UNIQUEMENT dans EndMatch
     string lastMatchWinner = "";
 
@@ -1197,8 +1199,14 @@ public class GameManager : MonoBehaviour
     // ===== Contre-Jeu (interruptions du tour IA) =====
     // Fenêtre ouverte : l'IA est en pause, le joueur peut jouer un artefact de Contre-Jeu ou Next.
     private bool awaitingCounterPlay = false;
-    // PiercedPurse : -25% sur la bank de l'IA pour CE tour (0.75).
+    // PiercedPurse : -25% sur la bank de l'IA pour CE tour (0.75). Guillotine : 0.
     private float aiBankMultiplier = 1f;
+    // Nom du Contre-Jeu à afficher dans ScoreModifierText quand la bank IA est modifiée.
+    private string aiBankModLabel = "Bourse percée";
+    // Vrai UNIQUEMENT pendant la fenêtre de contre-jeu qui précède DIRECTEMENT une bank de l'IA
+    // (score du tour validé mais pas encore banqué). La Guillotine n'est jouable qu'à ce moment.
+    private bool aiPreBankCounterOpen = false;
+    public bool IsAIPreBankCounterOpen() => awaitingCounterPlay && currentTurn == Turn.AI && aiPreBankCounterOpen;
     // Dés du Flash IA en cours (valide uniquement pendant la fenêtre qui suit un Flash).
     private readonly List<int> aiFlashIndices = new List<int>();
     // Un contre-jeu a touché un dé du Flash → le Flash est invalidé (pas de Clause).
@@ -1346,6 +1354,41 @@ public class GameManager : MonoBehaviour
         RebuildTraitIconsInto(aiTraitsIconsRoot, activeEnemyTraitInfos, isPlayerSide: false);
     }
 
+    // ===== Contour « trait actif » (l'effet est en train d'agir) — joueur ET IA =====
+    // Registre des vignettes vivantes par clé, pour piloter le contour sans tout reconstruire.
+    private readonly Dictionary<string, TraitIconView> playerTraitViews = new();
+    private readonly Dictionary<string, TraitIconView> aiTraitViews = new();
+    // Clés dont le contour est allumé : mémorisé pour survivre à une reconstruction des icônes.
+    private readonly HashSet<string> playerActiveTraitOutlines = new();
+    private readonly HashSet<string> aiActiveTraitOutlines = new();
+
+    // Allume/éteint le contour « actif » d'un trait et mémorise l'état.
+    void SetTraitActiveOutline(string key, bool isPlayerSide, bool on)
+    {
+        key = NormalizeTraitKey(key);
+        var set = isPlayerSide ? playerActiveTraitOutlines : aiActiveTraitOutlines;
+        if (on) set.Add(key); else set.Remove(key);
+
+        var map = isPlayerSide ? playerTraitViews : aiTraitViews;
+        if (map.TryGetValue(key, out var v) && v) v.SetActiveOutline(on);
+    }
+
+    // Marque un trait comme « actif » : le contour reste allumé AU MOINS jusqu'à la fin du tour
+    // en cours (joueur ou IA). Il est effacé par ClearAllTraitActiveOutlines au StartNewTurn suivant.
+    public void MarkTraitActiveForTurn(string key, bool isPlayerSide)
+    {
+        SetTraitActiveOutline(key, isPlayerSide, true);
+    }
+
+    // Éteint tous les contours (au changement de tour : rien ne traîne d'un tour à l'autre).
+    void ClearAllTraitActiveOutlines()
+    {
+        playerActiveTraitOutlines.Clear();
+        aiActiveTraitOutlines.Clear();
+        foreach (var v in playerTraitViews.Values) if (v) v.SetActiveOutline(false);
+        foreach (var v in aiTraitViews.Values) if (v) v.SetActiveOutline(false);
+    }
+
     // Un trait à effet UNIQUE (1×/match) a-t-il déjà été consommé ?
     // Le Verre Empoisonné existe des deux côtés : le drapeau dépend du porteur.
     bool IsTraitConsumed(string key, bool isPlayerSide)
@@ -1361,9 +1404,39 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    // Signature du dernier rendu par côté : évite de DÉTRUIRE/recréer les vignettes quand rien
+    // n'a changé (mêmes traits, mêmes états). Détruire un objet encore sélectionné dans
+    // l'Inspector fait cracher l'Éditeur (SerializedObjectNotCreatableException) — on limite donc
+    // ces destructions aux seuls vrais changements.
+    private string lastPlayerTraitSig = null;
+    private string lastAiTraitSig = null;
+
+    string TraitIconsSignature(List<TraitDef> traits, bool isPlayerSide)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var t in traits)
+        {
+            if (t == null) continue;
+            bool inactive = !isPlayerSide && !activeEnemyTraitKeys.Contains(t.key);
+            bool consumed = IsTraitConsumed(t.key, isPlayerSide);
+            bool hasIcon = GetTraitIcon(t) != null;
+            sb.Append(t.key).Append(consumed ? '1' : '0').Append(inactive ? '1' : '0').Append(hasIcon ? '1' : '0').Append(';');
+        }
+        return sb.ToString();
+    }
+
     void RebuildTraitIconsInto(RectTransform root, List<TraitDef> traits, bool isPlayerSide)
     {
         if (!root) return;
+
+        // Rien n'a changé depuis le dernier rendu de ce côté → on NE détruit rien (les vignettes
+        // existantes restent valides, le contour « actif » est piloté à part par SetTraitActiveOutline).
+        string sig = TraitIconsSignature(traits, isPlayerSide);
+        if (isPlayerSide) { if (sig == lastPlayerTraitSig) return; lastPlayerTraitSig = sig; }
+        else              { if (sig == lastAiTraitSig)     return; lastAiTraitSig = sig; }
+
+        // Les anciennes vignettes vont être détruites : on vide le registre de ce côté.
+        (isPlayerSide ? playerTraitViews : aiTraitViews).Clear();
 
         for (int i = root.childCount - 1; i >= 0; i--)
             Destroy(root.GetChild(i).gameObject);
@@ -1420,6 +1493,12 @@ public class GameManager : MonoBehaviour
             // Côté IA : un trait présent mais NON ACTIVÉ à ce palier est affiché atténué.
             bool inactive = !isPlayerSide && !activeEnemyTraitKeys.Contains(t.key);
             view.Setup(sprite, t.name, t.desc, tooltip, IsTraitConsumed(t.key, isPlayerSide), inactive);
+
+            // Enregistre la vignette et ré-applique un éventuel contour « actif » en cours.
+            string nkey = NormalizeTraitKey(t.key);
+            (isPlayerSide ? playerTraitViews : aiTraitViews)[nkey] = view;
+            if ((isPlayerSide ? playerActiveTraitOutlines : aiActiveTraitOutlines).Contains(nkey))
+                view.SetActiveOutline(true);
         }
     }
 
@@ -1498,6 +1577,7 @@ public class GameManager : MonoBehaviour
         playerScore += transfer;
         ShowAction($"Impôts bourgeois : égalité parfaite ! L'adversaire vous cède {transfer} pts.");
         uiLog?.Append($"Trait Impôts bourgeois : transfert de {transfer} pts (IA → Joueur).");
+        MarkTraitActiveForTurn("player.tax", isPlayerSide: true);
         UpdateUI();
     }
 
@@ -1510,6 +1590,7 @@ public class GameManager : MonoBehaviour
         RebuildTraitIcons(); // marque le trait « (utilisé) » dans l'AddBox
         hintBanner?.Show("Audit des Morts : le Boss annule votre artefact et le confisque !");
         uiLog?.Append("Trait Boss Audit des Morts : artefact annulé et retiré.");
+        MarkTraitActiveForTurn("boss.audit", isPlayerSide: false);
         return true;
     }
 
@@ -2056,6 +2137,7 @@ public class GameManager : MonoBehaviour
         turnScore += WELLBORN_TURN_BONUS;
         JournalCurrent($"Bien né : +{WELLBORN_TURN_BONUS} pts sur le tour");
         uiLog?.Append($"Bien né ({(who == Turn.Player ? "joueur" : "IA")}) : +{WELLBORN_TURN_BONUS} au score du tour.");
+        MarkTraitActiveForTurn("wellborn", isPlayerSide: who == Turn.Player);
         UpdateUI();
     }
 
@@ -2273,6 +2355,7 @@ public class GameManager : MonoBehaviour
             {
                 palierPanelView.Render(BuildPalierSnapshot(), animate: false); // ouverture manuelle : instantané
                 palierPanelView.transform.SetAsLastSibling(); // passe AU-DESSUS du bouton de palier
+                KeepHintBannerOnTop();
             }
             else palierPanelView.Close();
             return;
@@ -2282,7 +2365,15 @@ public class GameManager : MonoBehaviour
         bool willOpen = !palierPanel.activeSelf;
         if (willOpen) RefreshCampaignUI(); // contenu à jour à l'ouverture
         palierPanel.SetActive(willOpen);
-        if (willOpen) palierPanel.transform.SetAsLastSibling();
+        if (willOpen) { palierPanel.transform.SetAsLastSibling(); KeepHintBannerOnTop(); }
+    }
+
+    // Le bandeau d'indices partage le parent (Canvas) des panneaux qu'on remonte au premier
+    // plan via SetAsLastSibling (ex : PalierPanel). Sans ça, le panneau passait DEVANT le
+    // bandeau. On repasse donc le bandeau en dernier pour qu'il reste visible au-dessus.
+    void KeepHintBannerOnTop()
+    {
+        if (hintBanner) hintBanner.transform.SetAsLastSibling();
     }
 
     public void ClosePalierPanel()
@@ -2302,6 +2393,7 @@ public class GameManager : MonoBehaviour
         bool wasActive = palierPanelView.gameObject.activeSelf;
         palierPanelView.Render(BuildPalierSnapshot(), animate: !wasActive);
         palierPanelView.transform.SetAsLastSibling(); // au-dessus du bouton de palier
+        KeepHintBannerOnTop();
     }
 
 
@@ -2323,6 +2415,13 @@ public class GameManager : MonoBehaviour
         }
 
         bool isDefeat = lastMatchWinner == AI_NAME;
+        // Chemin boisé : ce match perdu est concédé, on n'enregistre AUCUNE défaite (pas de vie perdue).
+        if (isDefeat && concedeNoLifeLoss)
+        {
+            concedeNoLifeLoss = false;
+            uiLog?.Append("Chemin boisé : combat concédé — aucune vie perdue.");
+            isDefeat = false; // on saute tout le bloc de comptage/défaite ci-dessous
+        }
         if (isDefeat)
         {
             defeatsCount++;
@@ -2473,7 +2572,13 @@ public class GameManager : MonoBehaviour
         if (bankButton) bankButton.interactable = false;
         if (endRoundButton) endRoundButton.interactable = false;
 
-        if (gameOverPanel) gameOverPanel.SetActive(true);
+        if (gameOverPanel)
+        {
+            gameOverPanel.SetActive(true);
+            // Le panneau Game Over doit couvrir TOUT — y compris le PalierPanel/HintBanner qui
+            // se remontent via SetAsLastSibling. On le repasse donc en dernier (même parent).
+            gameOverPanel.transform.SetAsLastSibling();
+        }
         if (gameOverTitleText) gameOverTitleText.text = "Game Over";
         if (gameOverDescText) gameOverDescText.text = string.IsNullOrEmpty(description) ? "Campagne terminée." : description;
 
@@ -2510,6 +2615,8 @@ public class GameManager : MonoBehaviour
         CleanupLingeringAddedDice();
         CleanupAddedDice(); // le(s) dé(s) surprise disparaissent au changement de tour
         ClearScoreModifier();
+        HideAIBankModifierLabel(); // efface l'éventuel affichage Bourse percée (bank IA) du tour précédent
+        ClearAllTraitActiveOutlines(); // les contours « trait actif » ne survivent pas au changement de tour
 
         currentTurn = who;
 
@@ -2531,7 +2638,9 @@ public class GameManager : MonoBehaviour
 
         // Reset des états de Contre-Jeu à chaque changement de tour
         awaitingCounterPlay = false;
+        aiPreBankCounterOpen = false;
         aiBankMultiplier = 1f;
+        aiBankModLabel = "Bourse percée";
         aiFlashIndices.Clear();
         aiFlashCancelled = false;
         aiDiceChangedByCounter = false;
@@ -2838,6 +2947,12 @@ public class GameManager : MonoBehaviour
 
     void ApplyButtonsState()
     {
+        // Contour « actif » du trait Happy Hour (ennemi) : il agit dès que le joueur dépasse
+        // 75 pts sur le tour (bank obligatoire). Une fois déclenché, on le VERROUILLE pour le
+        // reste du tour (il ne s'éteint pas si le score varie) ; effacé au prochain StartNewTurn.
+        if (currentTurn == Turn.Player && EnemyTraitActive("happyhour") && turnScore > 75)
+            MarkTraitActiveForTurn("happyhour", isPlayerSide: false);
+
         // Tutoriel inerte : aucun bouton actionnable tant qu'aucune phase n'est mise en scène.
         if (tutorialInert)
         {
@@ -2950,6 +3065,7 @@ public class GameManager : MonoBehaviour
     void CancelExternalDiePick()
     {
         extPickActive = false; extPickFilter = null; extOnPicked = null;
+        ClearDicePickHover();
     }
 
 
@@ -2979,6 +3095,7 @@ public class GameManager : MonoBehaviour
             int k = dice.IndexOf(die);
             if (k >= 0 && (externalDiePickFilter == null || externalDiePickFilter(k)))
             {
+                die.Bounce(); // effet de rebond sur le dé sélectionné
                 var cb = onExternalDiePicked;
                 ClearExternalDiePick();
                 cb?.Invoke(k);
@@ -3315,6 +3432,13 @@ public class GameManager : MonoBehaviour
         if (MustRollAllNow())
         { ShowAction("Relance obligatoire des 5 dés avant de pouvoir banquer."); return; }
 
+        CommitPlayerBankAndEndTurn();
+    }
+
+    // Crédite le score du tour au total du joueur (mods + traits) puis termine le tour.
+    // Extrait de OnPressBank pour être réutilisé par le Cercueil maudit (bank forcée).
+    void CommitPlayerBankAndEndTurn()
+    {
         foreach (var idx in mutableLocks) frozenLocks.Add(idx);
         mutableLocks.Clear();
         mutablePoints.Clear();
@@ -3336,6 +3460,7 @@ public class GameManager : MonoBehaviour
             adjusted = Mathf.RoundToInt(adjusted * 0.9f);
             uiLog?.Append($"Trait Boss Obole de Charon : bank {before} → {adjusted} (-10%).");
             hintBanner?.Show($"Obole de Charon : le Boss prélève sa dîme ({before} → {adjusted}).");
+            MarkTraitActiveForTurn("boss.obole", isPlayerSide: false);
         }
 
         // ==== Crédit du tour au score total du joueur ====
@@ -3354,6 +3479,7 @@ public class GameManager : MonoBehaviour
             playerScore = Mathf.RoundToInt(playerScore / 2f);
             ShowAction($"Verre Empoisonné : votre score est divisé par 2 ({before} → {playerScore}) !");
             uiLog?.Append($"Trait Verre Empoisonné : score joueur {before} → {playerScore}.");
+            MarkTraitActiveForTurn("poisonglass", isPlayerSide: false);
             UpdateUI();
         }
 
@@ -3659,6 +3785,7 @@ public class GameManager : MonoBehaviour
             dice[lastRolledIndices[0]].SetFace(DieFace.Ten);
             dice[lastRolledIndices[1]].SetFace(DieFace.Ten);
             ShowAction("Pistage : votre premier jet contient 2 dés de 10 !");
+            MarkTraitActiveForTurn("tracking", isPlayerSide: true);
         }
         playerHasRolledThisMatch = true;
 
@@ -3672,6 +3799,7 @@ public class GameManager : MonoBehaviour
             for (int k = 0; k < 3; k++) dice[lastRolledIndices[k]].SetFace(flashFace);
             ShowAction($"Runes magiques : un flash de {(int)flashFace} se matérialise !");
             uiLog?.Append($"Trait Runes magiques (joueur) : flash de {(int)flashFace}.");
+            MarkTraitActiveForTurn("runes", isPlayerSide: true);
         }
 
         // ---- TRAIT Boss « Marée montante » : chaque relance du joueur profite au Boss ----
@@ -3680,6 +3808,7 @@ public class GameManager : MonoBehaviour
             aiScore += TIDE_POINTS_PER_REROLL;
             ShowAction($"Marée montante : votre relance fait monter les eaux — +{TIDE_POINTS_PER_REROLL} pts pour le Boss !");
             uiLog?.Append($"Trait Boss Marée montante : +{TIDE_POINTS_PER_REROLL} au Boss (relance du joueur).");
+            MarkTraitActiveForTurn("boss.tide", isPlayerSide: false);
             UpdateUI();
         }
 
@@ -3693,6 +3822,7 @@ public class GameManager : MonoBehaviour
                 traitTitheExtra += 25;
                 ShowAction($"Tithe of Time : +25 au score à atteindre (total +{traitTitheExtra}) !");
                 uiLog?.Append($"Trait Boss Tithe of Time : score cible du joueur +25 (cumul +{traitTitheExtra}).");
+                MarkTraitActiveForTurn("boss.tithe", isPlayerSide: false);
             }
         }
 
@@ -3731,6 +3861,7 @@ public class GameManager : MonoBehaviour
                 dice[lowest].SetFace(DieFace.Two);
                 ShowAction("Soleil Noir : votre plus petite face est corrompue en 2 !");
                 uiLog?.Append("Trait Boss Soleil Noir : un dé devient 2.");
+                MarkTraitActiveForTurn("boss.blacksun", isPlayerSide: false);
             }
 
             JournalPlayer($"FLASH {DieTag(currentFlashFace)} (+{eval.pointsGained} pts) — doit Clause");
@@ -3763,6 +3894,7 @@ public class GameManager : MonoBehaviour
                 && lastRolledIndices.Count > 0 && aiRng.NextDouble() < 0.5)
             {
                 ShowAction("Nœud Coulant : une seconde chance — un dé est relancé !");
+                MarkTraitActiveForTurn("noose", isPlayerSide: true);
                 yield return new WaitForSeconds(0.6f);
                 int pick = lastRolledIndices[aiRng.Next(lastRolledIndices.Count)];
                 dice[pick].Roll();
@@ -3893,6 +4025,7 @@ public class GameManager : MonoBehaviour
             RebuildTraitIcons(); // marque le trait « (utilisé) » dans l'AddBox
             ShowAction("Coup d'estoc : le dé perdant vous accorde une relance — appuie sur ROLL !");
             uiLog?.Append("Trait Coup d'estoc (joueur) : relance exceptionnelle de la Clause.");
+            MarkTraitActiveForTurn("estoc", isPlayerSide: true);
             SetPhase(Phase.Clause);
             yield break;
         }
@@ -4045,7 +4178,9 @@ public class GameManager : MonoBehaviour
         if (counterPlayTimerBar) counterPlayTimerBar.gameObject.SetActive(false);
         awaitingCounterPlay = false;
         tutorialLoopCounterPlay = false; // fin de la démo de contre-jeu
-        if (endRoundButton) endRoundButton.interactable = false;
+        // On remet l'état des boutons selon la phase : si un contre-jeu (Guillotine) a terminé le
+        // tour de l'IA (AITurnWaitEnd), NEXT doit rester ACTIF — le désactiver ici bloquait le jeu.
+        ApplyButtonsState();
 
         // Un contre-jeu a bougé des dés : l'IA RE-SÉLECTIONNE les dés marquants libres
         // (elle ne les relance pas — le résultat du contre-jeu est définitif).
@@ -4159,6 +4294,7 @@ public class GameManager : MonoBehaviour
     public void CounterPlay_PiercedPurse()
     {
         aiBankMultiplier = 0.75f;
+        aiBankModLabel = "Bourse percée";
         hintBanner?.Show("Bourse percée : la prochaine bank de l'IA sera réduite de 25%.");
         uiLog?.Append("Contre-Jeu : Bourse percée (bank IA -25%).");
     }
@@ -4298,19 +4434,30 @@ public class GameManager : MonoBehaviour
         uiLog?.Append($"Contre-Jeu : Coup de table (dé {idx + 1} relancé, score IA réévalué).");
     }
 
-    // Clocher des Veilleurs : cible AUTOMATIQUEMENT le dé posé de plus HAUTE valeur.
+    // Clocher des Veilleurs : cible AUTOMATIQUEMENT le dé de plus HAUTE valeur qui COMPTE pour
+    // l'IA — un dé déjà verrouillé (Flash / scoré) OU un single marquant (5/10/SUN) encore LIBRE
+    // (ex: un 10 pas encore posé). Sans inclure ces singles libres, un 10 non verrouillé était
+    // ignoré et le jeu proposait de relancer les 5 d'un Flash, alors que le 10 est plus fort.
     // Si plusieurs dés partagent cette valeur (ex: 3×10), le joueur choisit lequel.
     public void CounterPlay_WatchersTower()
     {
-        var locked = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null && dice[i].isLocked).ToList();
-        if (locked.Count == 0)
+        bool Counts(int i)
         {
-            hintBanner?.Show("Clocher des Veilleurs : l'IA n'a aucun dé posé.");
+            if (dice[i] == null) return false;
+            if (dice[i].isLocked) return true;               // Flash / dé déjà scoré
+            var f = dice[i].GetFace();                        // single marquant encore libre
+            return f == DieFace.Five || f == DieFace.Ten || f == DieFace.Sun;
+        }
+
+        var candidates = Enumerable.Range(0, dice.Count).Where(Counts).ToList();
+        if (candidates.Count == 0)
+        {
+            hintBanner?.Show("Clocher des Veilleurs : l'IA n'a aucun dé à relancer.");
             return;
         }
 
-        int maxVal = locked.Max(i => HighValueOf(dice[i].GetFace()));
-        var top = locked.Where(i => HighValueOf(dice[i].GetFace()) == maxVal).ToList();
+        int maxVal = candidates.Max(i => HighValueOf(dice[i].GetFace()));
+        var top = candidates.Where(i => HighValueOf(dice[i].GetFace()) == maxVal).ToList();
 
         if (top.Count == 1)
         {
@@ -4351,7 +4498,8 @@ public class GameManager : MonoBehaviour
             var f = dice[i].GetFace();
             var lower = f switch
             {
-                DieFace.Sun => DieFace.Ten,
+                // Le SUN vaut 10 : l'affaiblir (-1 en valeur) donne 6 (comme un 10 → 6), pas un 10.
+                DieFace.Sun => DieFace.Six,
                 DieFace.Ten => DieFace.Six,
                 DieFace.Six => DieFace.Five,
                 DieFace.Five => DieFace.Four,
@@ -4420,14 +4568,21 @@ public class GameManager : MonoBehaviour
 
         while (phase == Phase.AITurnPlaying && !gameOver && !matchOver && !isGameOverScreen)
         {
-            // Fenêtre de contre-jeu APRÈS le lancé précédent (avant que l'IA rejoue/banque)
+            // Fenêtre de contre-jeu APRÈS le lancé précédent (avant que l'IA rejoue/banque).
+            // Si l'IA va BANQUER juste après (score validé, pas encore banqué), on ouvre la
+            // fenêtre en mode « pré-bank » → c'est le SEUL moment où la Guillotine est jouable.
+            aiPreBankCounterOpen = AIWouldBankNow();
             yield return StartCoroutine(AICounterPlayWindow());
-            if (gameOver || matchOver || isGameOverScreen) yield break;
+            aiPreBankCounterOpen = false;
+            // Un contre-jeu (Guillotine) peut avoir terminé le tour de l'IA sur-le-champ.
+            if (phase == Phase.AITurnWaitEnd || gameOver || matchOver || isGameOverScreen) yield break;
 
             yield return new WaitForSeconds(AI_DELAY);
 
             if (dice != null && dice.All(d => d != null && d.isLocked))
             {
+                // HOT DICE : les 5 dés scorent → RELANCE OBLIGATOIRE des 5 (règle du jeu). L'IA ne
+                // peut pas « confirmer » son score en gardant les 5 dés : elle doit tout relancer.
                 yield return StartCoroutine(ResolveAIRoll(allUnlocked: true));
                 if (phase == Phase.AITurnWaitEnd || gameOver || matchOver || isGameOverScreen) yield break;
                 continue;
@@ -4440,23 +4595,9 @@ public class GameManager : MonoBehaviour
                 continue;
             }
 
-            int palierWin = GetWinThresholdForPalier(palierIndex);
-            bool canOpenThisTurnIA = (turnScore >= ENTRY_THRESHOLD);
-            bool iaCanBank = aiOpened || canOpenThisTurnIA;
-
-            bool shouldBank = false;
-            if (iaCanBank)
-            {
-                // ➜ CHASE posée par le joueur : banque dès que l'IA dépasse la barre
-                if (finalPhase && challenger == Turn.Player && (aiScore + turnScore > targetScore))
-                {
-                    shouldBank = true;
-                }
-                else
-                {
-                    shouldBank = (aiScore + turnScore >= palierWin) || (turnScore >= 25);
-                }
-            }
+            // Décision de bank unifiée (même prédicat que la prévision « pré-bank » ci-dessus,
+            // pour que la fenêtre Guillotine tombe pile au bon moment).
+            bool shouldBank = AIWouldBankNow();
 
             // GARDE UNIQUEMENT CE if(shouldBank) — celui avec la fenêtre Contre-Jeu :
             if (shouldBank)
@@ -4467,9 +4608,14 @@ public class GameManager : MonoBehaviour
                 aiHasBankedThisTurn = true;
 
                 // ➜ ICI SEULEMENT on ajoute le tour au total IA (avec éventuel malus Contre-Jeu)
+                int baseTurnForBank = turnScore;
                 int aiGain = Mathf.RoundToInt(turnScore * aiBankMultiplier);
                 if (aiBankMultiplier < 1f)
-                    uiLog?.Append($"Bourse percée : bank IA {turnScore} → {aiGain} (×{aiBankMultiplier:0.##}).");
+                {
+                    int cutPct = Mathf.RoundToInt((1f - aiBankMultiplier) * 100f);
+                    uiLog?.Append($"{aiBankModLabel} : bank IA {baseTurnForBank} → {aiGain} (−{cutPct}%).");
+                    ShowAIBankModifierLabel($"{aiBankModLabel} : bank IA {baseTurnForBank} → {aiGain} (−{cutPct}%)");
+                }
                 aiGain = ApplyAIArtifactOnBank(aiGain); // Dot de mariage / Livre des Comptes de l'IA
                 aiScore += aiGain;
                 turnScore = 0;
@@ -4488,6 +4634,7 @@ public class GameManager : MonoBehaviour
                     aiScore = Mathf.RoundToInt(aiScore / 2f);
                     ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");
                     uiLog?.Append($"Trait Verre Empoisonné (joueur) : score IA {before} → {aiScore}.");
+                    MarkTraitActiveForTurn("poisonglass", isPlayerSide: true);
                     UpdateUI();
                 }
 
@@ -4525,6 +4672,26 @@ public class GameManager : MonoBehaviour
         // ⚠️ flashVisualIndices n'est PAS vidé ici : le surlignage orange des dés d'un Flash
         // doit SURVIVRE à la résolution de la Clause. Il n'est retiré que lorsque les dés
         // sont réellement relancés/annulés (nouveau jet complet, Corne de sommeil, Flash brisé).
+    }
+
+    // Prédicat central : dans l'état courant, l'IA banquerait-elle MAINTENANT (au lieu de
+    // relancer) ? Sert à la fois à la décision réelle et à savoir si la fenêtre de contre-jeu
+    // est « pré-bank » (score validé, pas encore banqué → Guillotine jouable).
+    bool AIWouldBankNow()
+    {
+        if (dice == null || dice.Count == 0) return false;
+        if (phase == Phase.Clause) return false; // une Clause n'est pas une bank directe
+
+        bool iaCanBank = aiOpened || turnScore >= ENTRY_THRESHOLD;
+
+        // Hot dice (les 5 dés scorent) : relance OBLIGATOIRE des 5 → ce n'est jamais une bank directe.
+        if (dice.All(d => d != null && d.isLocked)) return false;
+
+        if (!iaCanBank) return false;
+        int palierWin = GetWinThresholdForPalier(palierIndex);
+        if (finalPhase && challenger == Turn.Player)
+            return (aiScore + turnScore > targetScore); // décisif : ne banque que si ça gagne
+        return (aiScore + turnScore >= palierWin) || (turnScore >= 25);
     }
 
     // Verrouille une série de dés de l'IA UN PAR UN, avec un petit délai + pulse,
@@ -4610,6 +4777,7 @@ public class GameManager : MonoBehaviour
             dice[indicesToRoll[1]].SetFace(DieFace.Ten);
             hintBanner?.Show("Pistage : le Chasseur ouvre avec 2 dés de 10 !");
             uiLog?.Append("Trait Pistage : premier jet IA avec 2×10.");
+            MarkTraitActiveForTurn("tracking", isPlayerSide: false);
         }
         aiHasRolledThisMatch = true;
 
@@ -4623,6 +4791,7 @@ public class GameManager : MonoBehaviour
             for (int k = 0; k < 3; k++) dice[indicesToRoll[k]].SetFace(runeFace);
             hintBanner?.Show($"Runes magiques : la Magicienne invoque un flash de {(int)runeFace} !");
             uiLog?.Append($"Trait Runes magiques : flash IA de {(int)runeFace}.");
+            MarkTraitActiveForTurn("runes", isPlayerSide: false);
         }
 
         // ---- Artefact IA : Balance de la justice (2→5, 6→10) si au moins 2 dés concernés ----
@@ -4675,7 +4844,8 @@ public class GameManager : MonoBehaviour
 
             yield return StartCoroutine(AICounterPlayWindow());
             aiFlashIndices.Clear(); // le Flash n'est plus "actif" pour la Corne hors de cette fenêtre
-            if (gameOver || matchOver || isGameOverScreen) yield break;
+            // Guillotine : le tour de l'IA peut avoir été terminé (score 0) pendant la fenêtre.
+            if (phase == Phase.AITurnWaitEnd || gameOver || matchOver || isGameOverScreen) yield break;
 
             // Le Flash tient-il toujours ? (un contre-jeu a pu l'annuler / casser le trio)
             bool flashStillValid = !aiFlashCancelled
@@ -4772,6 +4942,7 @@ public class GameManager : MonoBehaviour
         {
             hintBanner?.Show("Nœud Coulant : le Pendu relance un dé !");
             uiLog?.Append("Trait Nœud Coulant : relance d'un dé IA.");
+            MarkTraitActiveForTurn("noose", isPlayerSide: false);
             yield return new WaitForSeconds(0.6f);
             int pick = indicesToRoll[aiRng.Next(indicesToRoll.Count)];
             dice[pick].Roll();
@@ -4965,6 +5136,7 @@ public class GameManager : MonoBehaviour
                 estocRetryUsed = true;
                 hintBanner?.Show("Coup d'estoc : la Chevalière relance le dé perdant !");
                 uiLog?.Append("Trait Coup d'estoc : relance exceptionnelle de la Clause IA.");
+                MarkTraitActiveForTurn("estoc", isPlayerSide: false);
                 yield return new WaitForSeconds(CLAUSE_REPEAT_DELAY);
                 continue;
             }
@@ -5082,7 +5254,8 @@ public class GameManager : MonoBehaviour
         //  · défaite contre le BOSS (dernier palier) — la campagne se termine.
         // Dans les deux cas la Résurrection reste possible (gérée par AdvanceToNextOpponentOrPalier).
         bool isBossFight = palierIndex >= GetPalierCount() - 1;
-        bool willBeGameOver = (defeatsCount + 1) >= 3 || isBossFight;
+        // Chemin boisé : concession sans perte de vie → jamais un game over (et jamais contre le Boss).
+        bool willBeGameOver = !concedeNoLifeLoss && ((defeatsCount + 1) >= 3 || isBossFight);
         if (willBeGameOver)
         {
             awaitingVictoryNext = false;
@@ -6014,12 +6187,28 @@ public class GameManager : MonoBehaviour
         externalDiePickFilter = filter;
         onExternalDiePicked = onPicked;
         hintBanner?.Show(prompt);
+        SetDicePickHover(filter); // contour brillant au survol sur les dés ciblables
     }
 
     public void ClearExternalDiePick()
     {
         externalDiePickFilter = null;
         onExternalDiePicked = null;
+        ClearDicePickHover();
+    }
+
+    // Active le survol « ciblable » (glow) sur les dés valides pour l'artefact en cours.
+    void SetDicePickHover(Func<int, bool> filter)
+    {
+        if (dice == null) return;
+        for (int i = 0; i < dice.Count; i++)
+            if (dice[i] != null) dice[i].SetPickHoverEnabled(filter == null || filter(i));
+    }
+
+    void ClearDicePickHover()
+    {
+        if (dice == null) return;
+        foreach (var d in dice) if (d != null) d.SetPickHoverEnabled(false);
     }
 
     public IEnumerator Artifact_RerollOneDie(int idx)
@@ -6286,6 +6475,295 @@ public class GameManager : MonoBehaviour
         // StartNewMatch() remet déjà playerScore/aiScore/turnScore, les locks,
         // la phase, l’UI et appelle ResetForNewTurn() sur chaque dé.
         StartNewMatch();
+    }
+
+    // ===================== NOUVEAUX ARTEFACTS =====================
+
+    // Artefact du Temps Niv2 : REJOUE tout le tour depuis le début — le score du tour est
+    // REMIS À ZÉRO, tous les dés sont déverrouillés puis relancés comme au premier jet.
+    // (Différent du Niv1 qui refait le lancé en CONSERVANT le score.)
+    public System.Collections.IEnumerator Artifact_RestartTurn()
+    {
+        if (dice == null || dice.Count == 0) yield break;
+
+        turnScore = 0;
+        turnScoreAtRisk = false;
+        wimpoutLostTurnScore = 0;
+        flashPendingResolution = false;
+        clauseClearedBySelection = false;
+
+        foreach (var d in dice) if (d != null) d.SetLocked(false);
+        frozenLocks.Clear();
+        mutableLocks.Clear();
+        mutablePoints.Clear();
+        flashLockIndices.Clear();
+        flashVisualIndices.Clear();
+        eligibleLockIndices.Clear();
+        eligibleLockPoints.Clear();
+        UpdateUI();
+
+        var rollable = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null).ToList();
+        foreach (var i in rollable) dice[i].Roll();
+        lastRolledIndices.Clear();
+        lastRolledIndices.AddRange(rollable);
+        yield return null;
+        ApplyPendingFaceOverrides(lastRolledIndices);
+
+        if (HandleFullIfAny(lastRolledIndices, isAI: false)) yield break;
+
+        var eval = EvaluateRoll(lastRolledIndices, scoreSingles: false);
+        if (eval.createdFlash)
+        {
+            foreach (var i in eval.flashLockIndices)
+            {
+                dice[i].SetLocked(true);
+                frozenLocks.Add(i); flashLockIndices.Add(i); flashVisualIndices.Add(i);
+            }
+            turnScore += eval.pointsGained;
+            ShowAddScoreFx(eval.pointsGained);
+            currentFlashFace = eval.flashFace;
+            flashPendingResolution = true;
+            UpdateUI();
+            JournalPlayer($"Tour rejoué : FLASH {DieTag(currentFlashFace)} (+{eval.pointsGained} pts) — doit Clause");
+            FillEligibleFromIndices(lastRolledIndices.Where(i => !eval.flashLockIndices.Contains(i)).ToList());
+            SetPhase(Phase.Clause);
+            ShowAction($"FLASH {(int)currentFlashFace} — Clause.");
+            yield break;
+        }
+
+        FillEligibleFromIndices(lastRolledIndices);
+        if (eligibleLockIndices.Count > 0)
+        {
+            JournalPlayer("Tour rejoué — dés marquants à choisir");
+            ShowAction("Tour rejoué ! Sélectionne tes 5/10/SUN, puis ROLL pour continuer.");
+            SetPhase(Phase.Normal);
+        }
+        else
+        {
+            JournalPlayer("Tour rejoué sans succès, le joueur a raté ce tour.");
+            MarkPlayerTurnScoreAtRisk();
+            ShowAction("Wimpout.");
+            SetPhase(Phase.WaitEnd);
+        }
+        UpdateUI();
+        ApplyButtonsState();
+    }
+
+    // Sacrifice humain : conditions pour créer un Flash de 10 (3 dés libres deviennent des 10).
+    public bool CanCreateTenFlashNow()
+    {
+        if (gameOver || matchOver || isGameOverScreen) return false;
+        if (currentTurn != Turn.Player) return false;
+        if (flashPendingResolution) return false; // pas en pleine Clause
+        if (phase != Phase.Normal && phase != Phase.WaitEnd) return false; // après un jet
+        if (dice == null) return false;
+        // Un jet a eu lieu (au moins une face affichée) et 3 dés libres pour former le Flash.
+        bool hasFaces = dice.Any(d => d != null && d.faceImage && d.faceImage.sprite != null);
+        return hasFaces && dice.Count(d => d != null && !d.isLocked) >= 3;
+    }
+
+    // Sacrifice humain : force un FLASH de 10 en posant 10 sur 3 dés libres.
+    public void Artifact_CreateTenFlash()
+    {
+        if (!CanCreateTenFlashNow())
+        { hintBanner?.Show("Sacrifice humain : impossible de créer un flash maintenant."); return; }
+
+        var pick = Enumerable.Range(0, dice.Count)
+            .Where(i => dice[i] != null && !dice[i].isLocked)
+            .Take(3).ToList();
+        foreach (var i in pick) dice[i].SetFace(DieFace.Ten);
+        JournalPlayerAction("Sacrifice humain : un FLASH de 10 se matérialise !");
+        Artifacts_CreateFlashFromIndices(pick, DieFace.Ten);
+    }
+
+    // Cercueil maudit : conditions d'usage (il faut un score à sécuriser).
+    public bool CanUseCursedCoffinNow()
+    {
+        if (gameOver || matchOver || isGameOverScreen) return false;
+        if (currentTurn != Turn.Player) return false;
+        bool inPostRoll = phase == Phase.Normal || phase == Phase.Clause || phase == Phase.WaitEnd;
+        if (!inPostRoll) return false;
+        return turnScore > 0 || wimpoutLostTurnScore > 0 || turnScoreAtRisk;
+    }
+
+    // Cercueil maudit : banque le score courant (même en péril / en pleine Clause) et MET FIN au tour.
+    public void Artifact_CursedCoffinBank()
+    {
+        // Récupère un éventuel score « en péril » / perdu au wimpout : le Cercueil le sécurise.
+        RestoreWimpoutScoreIfAny();
+        if (turnScore <= 0)
+        { hintBanner?.Show("Cercueil maudit : aucun score à banquer."); return; }
+
+        // Sécurise même en pleine Clause : les points du Flash sont déjà dans turnScore.
+        flashPendingResolution = false;
+        ClearClauseState();
+        turnScoreAtRisk = false;
+        wimpoutLostTurnScore = 0;
+
+        int entry = (rules != null) ? rules.entryThreshold : 35;
+        if (!playerOpened && GetEffectiveTurnScoreForEntry() >= entry) playerOpened = true;
+
+        JournalPlayerAction("Cercueil maudit : score sécurisé, le tour prend fin.");
+        hintBanner?.Show("Cercueil maudit : score banqué, fin du tour.");
+        CommitPlayerBankAndEndTurn();
+    }
+
+    // Mystérieux colis : ajoute un artefact ALÉATOIRE de la bibliothèque à l'inventaire du joueur.
+    public bool Artifact_AddRandomToInventory()
+    {
+        if (artifactLibrary == null || artifactLibrary.artifacts == null || playerInventory == null)
+        { hintBanner?.Show("Mystérieux colis : aucune bibliothèque d'artefacts."); return false; }
+
+        var pool = artifactLibrary.artifacts.FindAll(a => a != null);
+        if (pool.Count == 0) return false;
+        if (playerInventory.Count >= PlayerInventory.Capacity)
+        { hintBanner?.Show("Mystérieux colis : inventaire plein !"); return false; }
+
+        var pick = pool[UnityEngine.Random.Range(0, pool.Count)];
+        if (!playerInventory.TryAdd(pick)) return false;
+
+        hintBanner?.Show($"Mystérieux colis : « {pick.displayName} » rejoint votre inventaire !");
+        uiLog?.Append($"Mystérieux colis : +1 artefact ({pick.displayName}).");
+        RefreshInventoryUI();
+        return true;
+    }
+
+    // Sacrifice humain : retire un artefact aléatoire de l'inventaire (le colis/sacrifice s'est
+    // déjà retiré lui-même via onConsumed, donc tout ce qui reste est « un autre » artefact).
+    public Artifact Artifact_SacrificeRandomArtifact()
+    {
+        if (playerInventory == null || playerInventory.Count == 0) return null;
+        int idx = UnityEngine.Random.Range(0, playerInventory.Count);
+        var victim = playerInventory.GetAt(idx);
+        playerInventory.RemoveAt(idx);
+        RefreshInventoryUI();
+        if (victim)
+        {
+            hintBanner?.Show($"Sacrifice humain : « {victim.displayName} » est sacrifié !");
+            uiLog?.Append($"Sacrifice humain : artefact sacrifié ({victim.displayName}).");
+        }
+        return victim;
+    }
+
+    void RefreshInventoryUI()
+    {
+        if (inventoryUI) inventoryUI.RefreshNow();
+        inventoryDots?.Refresh();
+    }
+
+    // Guillotine flambant neuve (Contre-Jeu) : annule le score du tour de l'IA. On force le
+    // multiplicateur de bank à 0 : quelle que soit la suite du tour, l'IA banquera 0 point.
+    // (Réutilise la mécanique éprouvée de la Bourse percée, sans interrompre la coroutine IA.)
+    public void CounterPlay_Guillotine()
+    {
+        // Annulation IMMÉDIATE : le score du tour de l'IA tombe à 0 tout de suite (pas de bank
+        // ni de recompte). On nettoie les dés/verrous scorés et on termine le tour de l'IA.
+        turnScore = 0;
+        if (dice != null)
+            foreach (var d in dice)
+                if (d != null) { d.SetLocked(false); d.SetFlashHighlight(false); }
+
+        frozenLocks.Clear();
+        flashLockIndices.Clear();
+        flashVisualIndices.Clear();
+        mutableLocks.Clear();
+        mutablePoints.Clear();
+        aiFlashIndices.Clear();
+        aiFlashCancelled = false;
+        flashPendingResolution = false;
+
+        aiHasBankedThisTurn = true;      // l'IA ne banquera rien de plus ce tour
+        aiDiceChangedByCounter = false;  // pas de re-sélection après la fenêtre
+        awaitingCounterPlay = false;     // ferme la fenêtre de contre-jeu
+
+        UpdateUI();
+        SetPhase(Phase.AITurnWaitEnd);   // le tour de l'IA se termine (le joueur appuie sur NEXT)
+
+        hintBanner?.Show("Guillotine flambant neuve : le score du tour de l'IA est annulé (0) !");
+        uiLog?.Append("Contre-Jeu : Guillotine — score du tour IA remis à 0, tour terminé.");
+    }
+
+    // ===================== ARTEFACTS LÉGENDAIRES =====================
+
+    // Chemin boisé : concède le combat en cours (compté comme perdu) SANS perdre de vie.
+    // Interdit contre le Boss (dernier palier).
+    public bool CanConcedeMatchNow()
+    {
+        if (gameOver || matchOver || isGameOverScreen) return false;
+        if (currentTurn != Turn.Player) return false;
+        if (palierIndex >= GetPalierCount() - 1) return false; // pas contre le Boss
+        return true;
+    }
+
+    public void Artifact_ConcedeMatchNoLife()
+    {
+        if (!CanConcedeMatchNow())
+        { hintBanner?.Show("Chemin boisé : inutilisable ici (ou contre le Boss)."); return; }
+
+        concedeNoLifeLoss = true;
+        JournalPlayerAction("Chemin boisé : combat abandonné (sans perte de vie).");
+        hintBanner?.Show("Chemin boisé : vous quittez ce combat sans perdre de vie.");
+        uiLog?.Append("Chemin boisé : combat concédé, aucune vie perdue.");
+        EndMatch(AI_NAME); // traité comme une défaite, mais concedeNoLifeLoss neutralise la perte de vie
+    }
+
+    // Cadeau royal : ajoute un artefact EPIC ou LÉGENDAIRE au hasard dans l'inventaire du joueur.
+    public bool Artifact_AddRandomEpicOrLegendaryToInventory()
+    {
+        if (artifactLibrary == null || artifactLibrary.artifacts == null || playerInventory == null)
+        { hintBanner?.Show("Cadeau royal : aucune bibliothèque d'artefacts."); return false; }
+
+        var pool = artifactLibrary.artifacts.FindAll(a => a != null &&
+            (a.rarity == ArtifactRarity.Epic || a.rarity == ArtifactRarity.Legendary));
+        if (pool.Count == 0)
+        { hintBanner?.Show("Cadeau royal : aucun artefact epic/légendaire disponible."); return false; }
+        if (playerInventory.Count >= PlayerInventory.Capacity)
+        { hintBanner?.Show("Cadeau royal : inventaire plein !"); return false; }
+
+        var pick = pool[UnityEngine.Random.Range(0, pool.Count)];
+        if (!playerInventory.TryAdd(pick)) return false;
+
+        hintBanner?.Show($"Cadeau royal : « {pick.displayName} » rejoint votre inventaire !");
+        uiLog?.Append($"Cadeau royal : +1 artefact epic/légendaire ({pick.displayName}).");
+        RefreshInventoryUI();
+        return true;
+    }
+
+    // Alignement cosmique : transforme aléatoirement TOUS les dés libres en 10 ou 5, avec un Sun.
+    public void Artifact_TransformAllToHigh()
+    {
+        var free = Enumerable.Range(0, dice.Count).Where(i => dice[i] != null && !dice[i].isLocked).ToList();
+        if (free.Count == 0)
+        { hintBanner?.Show("Alignement cosmique : aucun dé à transformer."); return; }
+
+        // Le Sun se pose de préférence sur le dé noir (isSunDie), sinon sur un dé au hasard.
+        int sunIndex = -1;
+        foreach (var i in free) if (dice[i].isSunDie) { sunIndex = i; break; }
+        if (sunIndex < 0) sunIndex = free[UnityEngine.Random.Range(0, free.Count)];
+
+        foreach (var i in free)
+        {
+            if (i == sunIndex) dice[i].SetFace(DieFace.Sun);
+            else dice[i].SetFace(UnityEngine.Random.value < 0.5f ? DieFace.Ten : DieFace.Five);
+        }
+
+        Artifacts_ReevaluateAfterDiceChanged("Alignement cosmique : les dés deviennent 10, 5 et un Sun !");
+    }
+
+    // Loto post mortem : gain instantané de 150 points au score du joueur.
+    public void Artifact_LotoPostMortem()
+    {
+        if (IsMatchOverOrScreen()) return;
+        playerScore += 150;
+        // Ce gain massif OUVRE le joueur : le seuil d'entrée (35 pts) ne s'applique plus,
+        // il peut désormais banquer n'importe quel montant sur ce tour.
+        playerOpened = true;
+        JournalPlayerAction("Loto post mortem : +150 pts");
+        hintBanner?.Show("Loto post mortem : +150 points !");
+        uiLog?.Append("Loto post mortem : +150 pts (gain instantané, joueur ouvert).");
+        UpdateUI();
+        CheckWinConditionOnTurnEnded(); // un gain de 150 peut déclencher la phase finale
+        ApplyButtonsState();
     }
 
     public void Artifacts_RefreshEligibilityAndUI()
@@ -6743,19 +7221,56 @@ public class GameManager : MonoBehaviour
             yield break;
         }
 
-        // --- Pas de flash et pas de banc auto (ou 0 point) ---
-        // ✅ IMPORTANT : regarder le board global pour éviter un wimpout injuste
+        // --- Le dé d'ajout n'est PAS marquant : "lancé nul" ---
         var allUnlocked = Enumerable.Range(0, dice.Count)
             .Where(i => dice[i] != null && !dice[i].isLocked).ToList();
 
         FillEligibleFromIndices(allUnlocked);
 
+        // Exception : pendant une Clause, si le dé d'ajout tombe pile sur la FACE du Flash en
+        // cours, il reste pertinent → on garde le déroulé normal de la Clause (ROLL autorisé).
+        if (flashPendingResolution && dv.GetFace() == currentFlashFace)
+        {
+            SetPhase(Phase.Clause);
+            hintBanner?.Show("Dé d’ajout sur la face du Flash — continue ta Clause ou ROLL.");
+            RemoveAddedDieFromPool(dv, keepVisibleUntilNextAction: true, dimmedNotLocked: true);
+            Artifacts_RefreshUI();
+            yield break;
+        }
+
+        // Dé surprise nul : le tour est perdu. On NE laisse PLUS relancer le reste des dés
+        // (auparavant le joueur récupérait une relance « gratuite », jugée injuste) : seul NEXT
+        // reste disponible, exactement comme un wimpout normal (score en péril si un artefact
+        // de sauvetage est disponible).
+        if (!canCauseWimpout)
+        {
+            // Grisé (non marquant) et retiré du pool : il ne re-roulera pas et ne compte pas.
+            RemoveAddedDieFromPool(dv, keepVisibleUntilNextAction: true, dimmedNotLocked: true);
+            JournalPlayer("Dé surprise nul — tour raté.");
+            uiLog?.Append("Dé surprise : lancé nul → wimpout.");
+
+            MarkPlayerTurnScoreAtRisk(); // remet à 0 (ou laisse « en péril » si sauvetage possible)
+
+            bool canStillRescue = PlayerHasRescueArtifact();
+            hintBanner?.Show(canStillRescue
+                ? "Dé surprise nul ! Un artefact peut encore sauver le tour — sinon NEXT."
+                : "Dé surprise nul — Wimpout. NEXT pour finir le tour.");
+
+            // Tant qu'un sauvetage reste possible, on ne clôt pas le match tout de suite.
+            if (canStillRescue) pendingWinCheckOnContinue = true;
+            else CheckWinConditionOnTurnEnded();
+
+            SetPhase(Phase.WaitEnd); // seul NEXT est actif
+            ApplyButtonsState();
+            yield break;
+        }
+
+        // --- Chemin historique (canCauseWimpout = true, non utilisé par le Dé surprise) ---
         // Clause en cours ?
         if (flashPendingResolution)
         {
             SetPhase(Phase.Clause);
             hintBanner?.Show("Le dé d’ajout n’est pas marquant — continue ta Clause ou ROLL.");
-            // ⬇️ RETIRER DU POOL pour éviter qu’il re-roll ; grisé (non marquant, ne compte pas).
             RemoveAddedDieFromPool(dv, keepVisibleUntilNextAction: true, dimmedNotLocked: true);
             Artifacts_RefreshUI();
             yield break;
@@ -6766,29 +7281,16 @@ public class GameManager : MonoBehaviour
         {
             SetPhase(Phase.Normal);
             hintBanner?.Show("Le dé d’ajout n’est pas marquant — tu peux sélectionner/banquer ou ROLL.");
-            // ⬇️ RETIRER DU POOL pour éviter qu’il re-roll ; grisé (non marquant, ne compte pas).
             RemoveAddedDieFromPool(dv, keepVisibleUntilNextAction: true, dimmedNotLocked: true);
             Artifacts_RefreshUI();
             yield break;
         }
 
-        // Rien de marquant sur le board
-        if (canCauseWimpout)
-        {
-            // wimpout réel (jamais utilisé par Dé surprise)
-            turnScore = 0;
-            UpdateUI();
-            SetPhase(Phase.WaitEnd);
-            hintBanner?.Show("Wimpout.");
-        }
-        else
-        {
-            // Dé surprise : PAS de wimpout, et on le retire du pool pour ne plus jamais le relancer
-            SetPhase(Phase.Normal);
-            hintBanner?.Show("Le dé d’ajout n’est pas marquant — tu peux encore ROLL ou NEXT.");
-            // Grisé (non marquant) plutôt que verrouillé en bleu : il ne compte pas dans le score.
-            RemoveAddedDieFromPool(dv, keepVisibleUntilNextAction: true, dimmedNotLocked: true);
-        }
+        // Rien de marquant sur le board → wimpout réel
+        turnScore = 0;
+        UpdateUI();
+        SetPhase(Phase.WaitEnd);
+        hintBanner?.Show("Wimpout.");
 
         Artifacts_RefreshUI();
     }
@@ -6905,6 +7407,23 @@ public class GameManager : MonoBehaviour
         _scoreMod = ActiveScoreMod.None();
         UpdateScoreModBadge(preview: false);     // masque le label
         // Pas besoin d’appeler RefreshScoreModRuntimePreview ici
+    }
+
+    // Bourse percée (Contre-Jeu) : réutilise ScoreModifierText (scoreModLabel) pour montrer
+    // l'effet du malus sur la bank de l'IA. Aucun modificateur JOUEUR n'est actif pendant le
+    // tour de l'IA, le label est donc libre. Il est effacé au prochain StartNewTurn.
+    void ShowAIBankModifierLabel(string text)
+    {
+        if (!scoreModLabel) return;
+        scoreModLabel.gameObject.SetActive(true);
+        scoreModLabel.text = text;
+    }
+
+    void HideAIBankModifierLabel()
+    {
+        if (!scoreModLabel) return;
+        scoreModLabel.text = "";
+        scoreModLabel.gameObject.SetActive(false);
     }
 
     private void UpdateScoreModBadge(bool preview)
@@ -7093,7 +7612,15 @@ public class GameManager : MonoBehaviour
         if (aiHasBankedThisTurn) yield break;
         aiHasBankedThisTurn = true;
 
-        int aiChaseGain = ApplyAIArtifactOnBank(Mathf.RoundToInt(turnScore * aiBankMultiplier));
+        int baseTurnForChase = turnScore;
+        int reducedChase = Mathf.RoundToInt(turnScore * aiBankMultiplier);
+        if (aiBankMultiplier < 1f)
+        {
+            int cutPct = Mathf.RoundToInt((1f - aiBankMultiplier) * 100f);
+            ShowAIBankModifierLabel($"{aiBankModLabel} : bank IA {baseTurnForChase} → {reducedChase} (−{cutPct}%)");
+            uiLog?.Append($"{aiBankModLabel} : bank IA {baseTurnForChase} → {reducedChase} (−{cutPct}%).");
+        }
+        int aiChaseGain = ApplyAIArtifactOnBank(reducedChase);
         aiScore += aiChaseGain;     // ajoute UNE SEULE FOIS (malus Contre-Jeu + artefact IA)
         turnScore = 0;
         aiBankMultiplier = 1f;
@@ -7111,6 +7638,7 @@ public class GameManager : MonoBehaviour
             int before = aiScore;
             aiScore = Mathf.RoundToInt(aiScore / 2f);
             ShowAction($"Verre Empoisonné : le score de l'IA est divisé par 2 ({before} → {aiScore}) !");
+            MarkTraitActiveForTurn("poisonglass", isPlayerSide: true);
             UpdateUI();
         }
         CheckBourgeoisTax();

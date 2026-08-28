@@ -133,4 +133,70 @@ public class EntryTicketEffect : IArtifactEffect
     }
 }
 
+/// <summary>
+/// SCORE — "Cercueil maudit"
+/// Banque le score courant (même en péril / en pleine Clause) mais MET FIN au tour.
+/// </summary>
+public class CursedCoffinEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.CanUseCursedCoffinNow())
+        { reason = "Cercueil maudit : aucun score du tour à banquer."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        gm.Artifact_CursedCoffinBank();
+        onConsumed?.Invoke();
+    }
+}
+
+/// <summary>
+/// LÉGENDAIRE — "Chemin boisé"
+/// Concède le combat en cours (compté comme perdu) SANS perdre de vie. Interdit contre le Boss.
+/// </summary>
+public class WoodedPathEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.CanConcedeMatchNow())
+        { reason = "Chemin boisé : inutilisable ici (ou contre le Boss)."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        onConsumed?.Invoke();            // on se retire de l'inventaire AVANT de clore le match
+        gm.Artifact_ConcedeMatchNoLife();
+    }
+}
+
+/// <summary>
+/// LÉGENDAIRE — "Loto post mortem"
+/// Gain instantané de 150 points.
+/// </summary>
+public class LotoPostMortemEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.IsPlayerTurn || gm.IsMatchOverOrScreen())
+        { reason = "Utilisable pendant votre tour."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        gm.Artifact_LotoPostMortem();
+        onConsumed?.Invoke();
+    }
+}
+
 

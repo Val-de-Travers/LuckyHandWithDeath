@@ -28,12 +28,14 @@ public class ArtifactPowers : MonoBehaviour
         // 
         registry["reroll_one_die"] = new CheaterBoneEffect();
         registry["reroll_turn"] = new TimeRerollTurnEffect();
+        registry["restart_turn"] = new TimeRestartTurnEffect();   // Temps niv2 : relance tout le tour
         registry["reroll_match"] = new TimeRerollMatchEffect();
 
         // TRANSFORMATION
         registry["transform.balance"] = new JusticeBalanceEffect();
         registry["transform.plus1"] = new ApothecaryFortifierEffect();
         registry["transform.flashscroll"] = new FlashScrollEffect();
+        registry["transform.cosmic_alignment"] = new CosmicAlignmentEffect(); // Alignement cosmique (légendaire)
 
         var mirror = new MirrorEffect();
         registry["transform.mirror"] = mirror;
@@ -44,11 +46,17 @@ public class ArtifactPowers : MonoBehaviour
         registry["add.surprise"] = new SurpriseDieEffect();
         registry["add.bottle_sun"] = new BottleSunEffect();
         registry["add.love_filter"] = new LoveFilterEffect();
+        registry["add.mystery_parcel"] = new MysteryParcelEffect();   // Mystérieux colis
+        registry["add.human_sacrifice"] = new HumanSacrificeEffect(); // Sacrifice humain
+        registry["add.royal_gift"] = new RoyalGiftEffect();           // Cadeau royal (légendaire)
 
         // SCORE
         registry["score.funeral_ledger"] = new FuneralLedgerEffect();
         registry["score.marriage_dot"] = new MarriageDotEffect();
         registry["score.entry_ticket"] = new EntryTicketEffect();
+        registry["score.cursed_coffin"] = new CursedCoffinEffect();   // Cercueil maudit
+        registry["score.loto_postmortem"] = new LotoPostMortemEffect(); // Loto post mortem (légendaire)
+        registry["meta.concede_no_life"] = new WoodedPathEffect();      // Chemin boisé (légendaire)
 
         // CONTRE-JEU (jouable uniquement pendant le tour de l'IA)
         // Enregistré à la fois par effectKey ET par id normalisé (les assets ont souvent un effectKey vide).
@@ -57,6 +65,7 @@ public class ArtifactPowers : MonoBehaviour
         var slamTable = new SlamTableEffect();
         var watchersTower = new WatchersTowerEffect();
         var poison = new QuestionablePoisonCounterEffect();
+        var guillotine = new GuillotineCounterEffect();
 
         registry["counter.pierced_purse"] = piercedPurse;
         registry["piercedpurse"] = piercedPurse;              // id de l'asset
@@ -72,6 +81,9 @@ public class ArtifactPowers : MonoBehaviour
 
         registry["counter.poison"] = poison;
         registry["questionable_poison"] = poison;            // id de l'asset
+
+        registry["counter.guillotine"] = guillotine;
+        registry["guillotine"] = guillotine;                 // id de l'asset (fallback)
     }
 
     // Normalise un id/effectKey pour la recherche (trim + minuscules).

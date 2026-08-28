@@ -57,6 +57,25 @@ public class TimeRerollTurnEffect : IArtifactEffect
     }
 }
 
+// Artefact du Temps Niv2 : relance TOUT son tour (score du tour remis à zéro, dés relancés).
+public class TimeRestartTurnEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.CanUseRelanceNow())
+        { reason = "Utilisable après un jet."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        gm.StartCoroutine(gm.Artifact_RestartTurn());
+        onConsumed?.Invoke();
+    }
+}
+
 public class TimeRerollMatchEffect : IArtifactEffect
 {
     public bool IsUsableNow(GameManager gm, out string reason)

@@ -65,6 +65,48 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         }
     }
 
+    // ==== Contour blanc « trait actif » (l'effet est en train d'agir) ====
+    [Header("Contour actif")]
+    [Tooltip("Épaisseur (px) du contour blanc affiché quand le trait agit.")]
+    public float activeOutlineThickness = 6f;
+    GameObject activeOutline;
+
+    // Affiche/masque un cadre blanc autour de la vignette pour signaler que l'effet du trait
+    // est en train d'agir. Piloté par GameManager (côté joueur ET IA).
+    public void SetActiveOutline(bool on)
+    {
+        if (on && activeOutline == null) BuildActiveOutline();
+        if (activeOutline) activeOutline.SetActive(on);
+    }
+
+    void BuildActiveOutline()
+    {
+        activeOutline = new GameObject("ActiveOutline", typeof(RectTransform));
+        var rt = (RectTransform)activeOutline.transform;
+        rt.SetParent(transform, false);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        activeOutline.transform.SetAsLastSibling(); // au-dessus de l'icône
+
+        float t = Mathf.Max(1f, activeOutlineThickness);
+        AddOutlineBar(rt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, t)); // haut
+        AddOutlineBar(rt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, t)); // bas
+        AddOutlineBar(rt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(t, 0f)); // gauche
+        AddOutlineBar(rt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(t, 0f)); // droite
+    }
+
+    void AddOutlineBar(RectTransform parent, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 size)
+    {
+        var bar = new GameObject("Bar", typeof(RectTransform));
+        var rt = (RectTransform)bar.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = aMin; rt.anchorMax = aMax; rt.pivot = pivot;
+        rt.sizeDelta = size; rt.anchoredPosition = Vector2.zero;
+        var img = bar.AddComponent<Image>();
+        img.color = Color.white;
+        img.raycastTarget = false;
+    }
+
     // ==== Mise en avant au survol (les vignettes se chevauchent quand elles sont nombreuses) ====
     [Header("Hover")]
     public float hoverScale = 1.25f;

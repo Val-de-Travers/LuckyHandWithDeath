@@ -12,13 +12,15 @@ public class DiceSprites {
     public Sprite two, three, four, five, six, ten;
 }
 
-// Faces du dé NOIR : le SUN remplace le 10, il n'y a donc pas de face 10.
+// Faces du dé NOIR (Sun) : le SUN remplace le 3 (comme dans le jeu d'origine). Ce dé a donc
+// ses propres images pour 2, 4, 5, 6, 10 et SUN — pas de face 3 (l'image `three` n'est plus
+// utilisée au tirage, conservée par compatibilité).
 [Serializable]
 public class BlackDiceSprites {
-    public Sprite two, three, four, five, six, sun;
+    public Sprite two, three, four, five, six, ten, sun;
 }
 
-public class DieView : MonoBehaviour, IPointerClickHandler
+public class DieView : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     [Header("Wiring")]
     public Image faceImage;         // Image enfant "Face" (affiche la face)
@@ -36,7 +38,7 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     // Le dé noir a-t-il son propre jeu d'images ? (sinon on garde l'ancien rendu en négatif)
     bool HasBlackSprites => isSunDie && blackSprites != null &&
         (blackSprites.two || blackSprites.three || blackSprites.four ||
-         blackSprites.five || blackSprites.six || blackSprites.sun);
+         blackSprites.five || blackSprites.six || blackSprites.ten || blackSprites.sun);
 
     // Image du SUN partagée par tous les dés : un dé de BASE peut afficher un Sun posé par un
     // artefact (Miroir, Soleil en bouteille) alors que son jeu de sprites n'en contient pas.
@@ -169,9 +171,10 @@ public class DieView : MonoBehaviour, IPointerClickHandler
 
     public void Roll()
     {
-        // Dé noir : le SUN remplace la face 10 (il n'y a donc pas de 10 sur ce dé).
+        // Dé noir (Sun) : comme dans le jeu d'origine, la face 3 est remplacée par un SUN.
+        // Faces : 2, SUN, 4, 5, 6, 10 (pas de 3 ; le 10 existe, en noir via die_10_b).
         var pool = isSunDie
-            ? new List<DieFace> { DieFace.Two, DieFace.Three, DieFace.Four, DieFace.Five, DieFace.Six, DieFace.Sun }
+            ? new List<DieFace> { DieFace.Two, DieFace.Sun, DieFace.Four, DieFace.Five, DieFace.Six, DieFace.Ten }
             : new List<DieFace> { DieFace.Two, DieFace.Three, DieFace.Four, DieFace.Five, DieFace.Six, DieFace.Ten };
 
         int idx = rng.Next(0, pool.Count);
@@ -228,7 +231,9 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     {
         if (lockIcon) lockIcon.enabled = false;
         if (holdHighlight) holdHighlight.enabled = false;
-        if (faceImage) faceImage.color = dimmed ? new Color(0.45f, 0.45f, 0.45f, 0.75f) : Color.white;
+        // Grisé mais OPAQUE (alpha 1) : l'ancienne alpha 0.75 donnait un rendu « transparent »
+        // qui semblait buggé sur le dé d'ajout. On assombrit sans laisser voir à travers.
+        if (faceImage) faceImage.color = dimmed ? new Color(0.5f, 0.5f, 0.5f, 1f) : Color.white;
 
         // Un dé grisé n'est plus interactif.
         var selfImg = GetComponent<Image>();
@@ -299,7 +304,7 @@ public class DieView : MonoBehaviour, IPointerClickHandler
         return null;
     }
 
-    // Face du dé noir (pas de 10 dans ce jeu : le SUN le remplace).
+    // Face du dé noir (Sun) : 2, 4, 5, 6, 10, SUN (le SUN remplace le 3 ; pas de face 3 au tirage).
     static Sprite FromBlack(BlackDiceSprites set, DieFace face)
     {
         if (set == null) return null;
@@ -310,6 +315,7 @@ public class DieView : MonoBehaviour, IPointerClickHandler
             case DieFace.Four:  return set.four;
             case DieFace.Five:  return set.five;
             case DieFace.Six:   return set.six;
+            case DieFace.Ten:   return set.ten;
             case DieFace.Sun:   return set.sun;
         }
         return null;
@@ -373,11 +379,17 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     }
 
     // --- petite anim pulse ---
+    // Pulse et Bounce partagent un même handle : une seule animation d'échelle à la fois
+    // (évite qu'un Pulse déclenché par SetFace/Roll et un rebond de sélection ne se combattent).
+    Coroutine _scaleCo;
+    bool _bouncing; // un rebond de sélection est en cours → prioritaire sur un Pulse
+
     public void Pulse(float duration = 0.5f, float peakScale = 1.12f)
     {
         if (!gameObject.activeInHierarchy) return;
-        StopCoroutine(nameof(PulseRoutine));
-        StartCoroutine(PulseRoutine(duration, peakScale));
+        if (_bouncing) return; // laisse le rebond de sélection se jouer entièrement
+        if (_scaleCo != null) StopCoroutine(_scaleCo);
+        _scaleCo = StartCoroutine(PulseRoutine(duration, peakScale));
     }
     System.Collections.IEnumerator PulseRoutine(float duration, float peak)
     {
@@ -395,6 +407,121 @@ public class DieView : MonoBehaviour, IPointerClickHandler
     public void OnPointerClick(PointerEventData eventData)
     {
         onClicked?.Invoke(this);
+    }
+
+    // ==== Ciblage de dé par un artefact : contour brillant au survol + rebond à la sélection ====
+    // pickHoverEnabled est piloté par GameManager quand un artefact attend qu'on désigne un dé.
+    [System.NonSerialized] public bool pickHoverEnabled;
+    GameObject pickGlow;
+    Image[] pickGlowBars;
+    Coroutine pickGlowHandle;
+
+    // Couleurs du dégradé du halo (haut → bas) : un bleu brillant vers cyan.
+    static readonly Color GlowTop = new Color(0.42f, 0.85f, 1f);   // #6BD9FF
+    static readonly Color GlowBottom = new Color(0.30f, 0.56f, 0.89f); // #4C90E3
+
+    public void SetPickHoverEnabled(bool on)
+    {
+        pickHoverEnabled = on;
+        if (!on) ShowPickGlow(false);
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (pickHoverEnabled) ShowPickGlow(true);
+    }
+
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        ShowPickGlow(false);
+    }
+
+    void ShowPickGlow(bool on)
+    {
+        if (on && pickGlow == null) BuildPickGlow();
+        if (pickGlow) pickGlow.SetActive(on);
+
+        if (on)
+        {
+            if (pickGlowHandle == null && gameObject.activeInHierarchy)
+                pickGlowHandle = StartCoroutine(PickGlowPulse());
+        }
+        else if (pickGlowHandle != null)
+        {
+            StopCoroutine(pickGlowHandle);
+            pickGlowHandle = null;
+        }
+    }
+
+    void BuildPickGlow()
+    {
+        pickGlow = new GameObject("PickGlow", typeof(RectTransform));
+        var rt = (RectTransform)pickGlow.transform;
+        rt.SetParent(transform, false);
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(-6f, -6f); // déborde un peu → effet de halo
+        rt.offsetMax = new Vector2(6f, 6f);
+        pickGlow.transform.SetAsLastSibling();
+
+        const float th = 5f;
+        pickGlowBars = new Image[4];
+        // Barres haut/bas prennent la couleur du dégradé aux extrémités ; gauche/droite une teinte médiane.
+        var mid = Color.Lerp(GlowTop, GlowBottom, 0.5f);
+        pickGlowBars[0] = MakeGlowBar(rt, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, th), GlowTop);
+        pickGlowBars[1] = MakeGlowBar(rt, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, th), GlowBottom);
+        pickGlowBars[2] = MakeGlowBar(rt, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(th, 0f), mid);
+        pickGlowBars[3] = MakeGlowBar(rt, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(th, 0f), mid);
+    }
+
+    static Image MakeGlowBar(RectTransform parent, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 size, Color col)
+    {
+        var bar = new GameObject("GlowBar", typeof(RectTransform));
+        var rt = (RectTransform)bar.transform;
+        rt.SetParent(parent, false);
+        rt.anchorMin = aMin; rt.anchorMax = aMax; rt.pivot = pivot;
+        rt.sizeDelta = size; rt.anchoredPosition = Vector2.zero;
+        var img = bar.AddComponent<Image>();
+        img.color = col;
+        img.raycastTarget = false;
+        return img;
+    }
+
+    // Pulse d'opacité du halo pour un effet « brillant ».
+    System.Collections.IEnumerator PickGlowPulse()
+    {
+        while (true)
+        {
+            float a = Mathf.Lerp(0.4f, 1f, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 4.5f));
+            if (pickGlowBars != null)
+                foreach (var b in pickGlowBars)
+                    if (b) { var c = b.color; c.a = a; b.color = c; }
+            yield return null;
+        }
+    }
+
+    // Rebond joué quand le dé est SÉLECTIONNÉ par un artefact (gonfle puis revient en oscillant).
+    public void Bounce()
+    {
+        if (!gameObject.activeInHierarchy) return;
+        if (_scaleCo != null) StopCoroutine(_scaleCo);
+        _bouncing = true;
+        _scaleCo = StartCoroutine(BounceRoutine());
+    }
+
+    System.Collections.IEnumerator BounceRoutine()
+    {
+        const float dur = 0.4f;
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.unscaledDeltaTime / dur;
+            // Oscillation amortie autour de 1 : rebond visible qui se stabilise.
+            float s = 1f + 0.30f * Mathf.Sin(t * Mathf.PI * 3f) * (1f - t);
+            transform.localScale = Vector3.one * s;
+            yield return null;
+        }
+        transform.localScale = Vector3.one;
+        _bouncing = false;
     }
     
 }

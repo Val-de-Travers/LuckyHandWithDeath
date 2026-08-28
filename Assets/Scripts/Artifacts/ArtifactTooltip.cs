@@ -39,8 +39,12 @@ public class ArtifactTooltip : MonoBehaviour
         var sortCanvas = GetComponent<Canvas>();
         if (!sortCanvas) sortCanvas = gameObject.AddComponent<Canvas>();
         sortCanvas.overrideSorting = true;
-        // Au-dessus de TOUT : voile/keep bright du tutoriel (5000+) et inventaire (30000).
-        sortCanvas.sortingOrder = Mathf.Max(tooltipSortingOrder, 32000);
+        // En TUTORIEL : au-dessus de TOUT (voile/keep bright 5000+ et inventaire 30000).
+        // En scène principale : simple tri modeste (au-dessus des vignettes de traits = 10)
+        // pour ne pas recouvrir les panneaux de jeu comme le faisait le tri géant.
+        sortCanvas.sortingOrder = TutorialScene.IsActive
+            ? Mathf.Max(tooltipSortingOrder, 32000)
+            : tooltipSortingOrder;
 
         // ✅ Anchors centrés + pivot en haut-gauche
         if (root)

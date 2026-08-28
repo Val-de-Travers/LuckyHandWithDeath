@@ -157,6 +157,24 @@ public class FlashScrollEffect : IArtifactEffect
     }
 }
 
+// Alignement cosmique (légendaire) : transforme aléatoirement tous les dés libres en 10, 5 et un Sun.
+public class CosmicAlignmentEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.CanUseRerollTurnNow()) { reason = "Utilisable après un jet."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        gm.Artifact_TransformAllToHigh();
+        onConsumed?.Invoke();
+    }
+}
+
 public class MirrorEffect : IArtifactEffect
 {
     public bool IsUsableNow(GameManager gm, out string reason)

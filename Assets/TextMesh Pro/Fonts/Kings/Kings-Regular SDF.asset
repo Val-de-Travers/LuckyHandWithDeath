@@ -57,8 +57,8 @@ MonoBehaviour:
     renderMode: 4165
     includeFontFeatures: 0
   m_SourceFontFile: {fileID: 0}
-  m_SourceFontFilePath: 
-  m_AtlasPopulationMode: 2
+  m_SourceFontFilePath:
+  m_AtlasPopulationMode: 1
   InternalDynamicOS: 0
   m_GlyphTable:
   - m_Index: 3

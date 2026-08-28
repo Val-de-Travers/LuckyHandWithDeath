@@ -62,6 +62,28 @@ public class SlamTableEffect : CounterPlayEffectBase
     }
 }
 
+// Guillotine flambant neuve : annule le score du tour de l'adversaire. Jouable UNIQUEMENT au
+// moment où l'IA valide son score en fin de tour (fenêtre « pré-bank »), pas en cours de tour.
+public class GuillotineCounterEffect : CounterPlayEffectBase
+{
+    public override bool IsUsableNow(GameManager gm, out string reason)
+    {
+        if (!base.IsUsableNow(gm, out reason)) return false;
+        if (!gm.IsAIPreBankCounterOpen())
+        {
+            reason = "Guillotine : jouable seulement quand l'adversaire valide son score (juste avant de banquer).";
+            return false;
+        }
+        return true;
+    }
+
+    public override void BeginUse(GameManager gm, Action onConsumed)
+    {
+        gm.CounterPlay_Guillotine();
+        onConsumed?.Invoke();
+    }
+}
+
 // Clocher des Veilleurs : le joueur désigne un dé de l'IA à relancer.
 public class WatchersTowerEffect : CounterPlayEffectBase
 {

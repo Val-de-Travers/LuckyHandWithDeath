@@ -17,6 +17,6 @@ MonoBehaviour:
   description: "Permet de relancer la partie avec son adversaire (Possible uniquement
     avant une d\xE9faite)"
   icon: {fileID: 21300000, guid: cf3583cc57688424a898d627439446b8, type: 3}
-  rarity: 1
+  rarity: 2
   type: 0
   effectKey: reroll_match

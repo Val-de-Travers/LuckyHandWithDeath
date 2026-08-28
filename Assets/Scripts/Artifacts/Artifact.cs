@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum ArtifactRarity { Common, Rare, Epic }
+public enum ArtifactRarity { Common, Rare, Epic, Legendary }
 
 public enum ArtifactType { Relance, Ajout, Transformation, Score, ContreJeu }
 

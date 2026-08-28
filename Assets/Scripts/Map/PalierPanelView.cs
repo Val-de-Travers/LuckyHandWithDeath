@@ -104,9 +104,10 @@ public class PalierPanelView : MonoBehaviour
                 seg.progressLine.type = Image.Type.Filled;
                 seg.progressLine.fillMethod = Image.FillMethod.Horizontal;
                 seg.progressLine.fillOrigin = (int)Image.OriginHorizontal.Left;
-                // Rouge du jeu (#E34C4C) — même source que le journal, garanti quel que soit
-                // le réglage de couleur laissé sur l'Image dans la scène.
-                seg.progressLine.color = GameColors.Points;
+                // Le sprite (PalierLineRed) est DÉJÀ rouge : on garde une teinte BLANCHE pour
+                // l'afficher nativement (#E34C4C). Teinter avec GameColors.Points le multipliait
+                // par lui-même → un rouge trop sombre.
+                seg.progressLine.color = Color.white;
                 seg.progressLine.fillAmount = 0f;
             }
             // État de base : TOUS les indicateurs sur Off, images/textes masqués.
