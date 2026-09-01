@@ -179,7 +179,8 @@ public class WoodedPathEffect : IArtifactEffect
 
 /// <summary>
 /// LÉGENDAIRE — "Loto post mortem"
-/// Gain instantané de 150 points.
+/// Gain instantané de 150 points, PUIS fin du tour : le score du tour en cours est annulé
+/// (les 150 points ne s'y ajoutent pas) et la main passe à l'adversaire.
 /// </summary>
 public class LotoPostMortemEffect : IArtifactEffect
 {
@@ -194,8 +195,8 @@ public class LotoPostMortemEffect : IArtifactEffect
 
     public void BeginUse(GameManager gm, Action onConsumed)
     {
+        onConsumed?.Invoke();             // on se retire de l'inventaire AVANT de clore le tour
         gm.Artifact_LotoPostMortem();
-        onConsumed?.Invoke();
     }
 }
 

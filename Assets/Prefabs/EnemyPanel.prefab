@@ -316,7 +316,7 @@ MonoBehaviour:
   m_text: Text Enemy
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ed292c379812a6842ad876d748bc0902, type: 2}
-  m_sharedMaterial: {fileID: -6923783738427946772, guid: ed292c379812a6842ad876d748bc0902, type: 2}
+  m_sharedMaterial: {fileID: -5093252708134461523, guid: ed292c379812a6842ad876d748bc0902, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -483,7 +483,7 @@ MonoBehaviour:
   m_enableAutoSizing: 0
   m_fontSizeMin: 50
   m_fontSizeMax: 72
-  m_fontStyle: 1
+  m_fontStyle: 16
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535

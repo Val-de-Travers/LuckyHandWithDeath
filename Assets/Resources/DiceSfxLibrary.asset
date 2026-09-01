@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a92d0bd9b56c423487dd125b4f3113f6, type: 3}
+  m_Name: DiceSfxLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::DiceSfxLibrary
+  dropDie:
+    clips:
+    - {fileID: 8300000, guid: 245d7ed5a34019648973ca0bd9b49faf, type: 3}
+    - {fileID: 8300000, guid: 7c30b5d0691df084f81e5e1bf55008a0, type: 3}
+    - {fileID: 8300000, guid: a027a9e853427a048afb6051d023aeba, type: 3}
+    - {fileID: 8300000, guid: ea624db5fe5da7a42858090d3ca89930, type: 3}
+    - {fileID: 8300000, guid: 190e7a0f27e6f0e44b4382f3674761aa, type: 3}
+    - {fileID: 8300000, guid: c271043b0b9ed9d4996a263bc26c232f, type: 3}
+    - {fileID: 8300000, guid: 9acc71d3e39b01a419d714f87a8cc80b, type: 3}
+    - {fileID: 8300000, guid: a82f169d88102854a8e8f841003326a0, type: 3}
+    - {fileID: 8300000, guid: 29b6850d9ab3174428ea2e936d054649, type: 3}
+    volume: 2
+    pitchJitter: 0.05
+    minInterval: 0.03
+  takeDie:
+    clips:
+    - {fileID: 8300000, guid: 302ff680221ed6e45b15b10a7157fdac, type: 3}
+    - {fileID: 8300000, guid: 1cb734fdf9b18454fafebd9f72ac056d, type: 3}
+    - {fileID: 8300000, guid: 38d062178d787e14e818babe3f9fe791, type: 3}
+    - {fileID: 8300000, guid: 94d754862103515419ec4f8df949d333, type: 3}
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03
+  takeDice:
+    clips:
+    - {fileID: 8300000, guid: 292e0df84b9bfda42a6890031298bf7f, type: 3}
+    - {fileID: 8300000, guid: 5ba7eef02b66ee34ea2f6e2a60ff0aca, type: 3}
+    - {fileID: 8300000, guid: 2d4fda00bcdd07b4f838a847440837b1, type: 3}
+    - {fileID: 8300000, guid: 148a6d470c1aca0479e06efd662a09a9, type: 3}
+    - {fileID: 8300000, guid: f30d5fe2222b99043a5de9f76ebc3b07, type: 3}
+    - {fileID: 8300000, guid: 4cd4179edd54ea9409d5614c803de2d8, type: 3}
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03
+  roll1Die:
+    clips:
+    - {fileID: 8300000, guid: 6c074e1acc513d6468e6888ba134a4a5, type: 3}
+    - {fileID: 8300000, guid: 9156ac763742f374e9a737790d5d4e02, type: 3}
+    - {fileID: 8300000, guid: 7301c01ed5d0b8f49ace619a32f0bf98, type: 3}
+    - {fileID: 8300000, guid: ccd42ae84fa89694c8a1a1552fae6d36, type: 3}
+    - {fileID: 8300000, guid: ac5247a9d884ec847a89268dcaf8be4f, type: 3}
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03
+  roll2to3Dice:
+    clips:
+    - {fileID: 8300000, guid: eff2be5a3fbb9db4db5584f98301d5e2, type: 3}
+    - {fileID: 8300000, guid: 2543152827bd58c4cb49febf1f973b16, type: 3}
+    - {fileID: 8300000, guid: 94fadc2e74a75214195cc2d1e06a1644, type: 3}
+    - {fileID: 8300000, guid: b97fd3b9aeee6ff4db14766eb6f27410, type: 3}
+    - {fileID: 8300000, guid: 79e2d574682cc1347b5c972bbfb77eb2, type: 3}
+    - {fileID: 8300000, guid: 8f20a7191b69e5a49b04b6c1770424ab, type: 3}
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03
+  roll4to5Dice:
+    clips:
+    - {fileID: 8300000, guid: b3c17bd74bbb8ea4f8a5e4c342b33da1, type: 3}
+    - {fileID: 8300000, guid: 70f9f105f7bcc5040982a31dfcacd1f4, type: 3}
+    - {fileID: 8300000, guid: 99287c2a80355c448a49f4781e0d9b66, type: 3}
+    - {fileID: 8300000, guid: 77728343df4a72d45a0eaa6b339c33ac, type: 3}
+    - {fileID: 8300000, guid: cb1b1690098fa0b42a9b5a2efb147bcd, type: 3}
+    - {fileID: 8300000, guid: 31cf8492cc49d704886828afc8a5a0d4, type: 3}
+    - {fileID: 8300000, guid: 10bf18871fcbe05458d45a52ff2b1d30, type: 3}
+    - {fileID: 8300000, guid: 0d9d564caf7f4a14eaeb93261bec4c63, type: 3}
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03
+  refuseDie:
+    clips: []
+    volume: 1
+    pitchJitter: 0.05
+    minInterval: 0.03

@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Artifact
   id: loto_postmortem
   displayName: Loto post mortem
-  description: "Gagne instantan\xE9ment 150 points."
+  description: "Gagne instantan\xE9ment 150 points, puis met fin \xE0 votre tour : le
+    score du tour en cours est annul\xE9."
   icon: {fileID: 6972543987481143088, guid: 8dd69cb39b1903f41b3842db64d13ada, type: 3}
   rarity: 3
   type: 3

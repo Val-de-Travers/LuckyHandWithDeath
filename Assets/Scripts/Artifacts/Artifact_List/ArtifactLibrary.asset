@@ -40,3 +40,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 139a79ccd5e3edd1fdfa03d426aa1eb3, type: 2}
   - {fileID: 11400000, guid: f3cbfa4669ec504d68d83bc7784801f2, type: 2}
   - {fileID: 11400000, guid: 2461a1b918fc262586d889acb4c001a9, type: 2}
+  weightCommon: 62
+  weightRare: 25
+  weightEpic: 10
+  weightLegendary: 3
+  uniqueHighRarityPerOffer: 1
+  uniqueFromRarity: 2

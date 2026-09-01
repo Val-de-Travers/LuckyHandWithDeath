@@ -68,7 +68,7 @@ MonoBehaviour:
   m_text: "Raret\xE9"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: ed292c379812a6842ad876d748bc0902, type: 2}
-  m_sharedMaterial: {fileID: -6923783738427946772, guid: ed292c379812a6842ad876d748bc0902, type: 2}
+  m_sharedMaterial: {fileID: -5093252708134461523, guid: ed292c379812a6842ad876d748bc0902, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -98,7 +98,7 @@ MonoBehaviour:
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
+  m_fontStyle: 1
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 256
   m_textAlignment: 65535
@@ -542,8 +542,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Type
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 5c94bc544ce90ee44881fdf355379ff0, type: 2}
-  m_sharedMaterial: {fileID: 2318694306362674232, guid: 5c94bc544ce90ee44881fdf355379ff0, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: b2ac570279d4418489b462cbb60d7dea, type: 2}
+  m_sharedMaterial: {fileID: 7786233097419825341, guid: b2ac570279d4418489b462cbb60d7dea, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

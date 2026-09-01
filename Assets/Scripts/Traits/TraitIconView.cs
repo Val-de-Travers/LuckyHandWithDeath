@@ -169,4 +169,18 @@ public class TraitIconView : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
         if (tooltip != null) tooltip.Hide();
     }
+
+    // Filet de sécurité : si la vignette est désactivée/détruite pendant qu'elle est survolée
+    // (ex : fin de match / Game Over — un panneau apparaît par-dessus sans que le curseur
+    // ne quitte réellement la vignette, donc OnPointerExit ne se déclenche jamais), le tooltip
+    // resterait affiché à l'écran indéfiniment. On le masque explicitement ici.
+    void OnDisable()
+    {
+        if (isHover)
+        {
+            isHover = false;
+            SetFront(false);
+            if (tooltip != null) tooltip.Hide();
+        }
+    }
 }
