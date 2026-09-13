@@ -142,8 +142,10 @@ public class ArtifactPowers : MonoBehaviour
             return true; // l'artefact quitte bien l'inventaire : l'animation est justifiée
         }
 
-        // Journal du joueur : nom de l'artefact utilisé (le détail de l'effet est ajouté par l'effet lui-même).
-        gm?.JournalPlayerAction($"Utilise « {a.displayName} »");
+        // Journal du joueur : nom de l'artefact (coloré selon sa rareté, comme sur les cartes).
+        // Le DÉTAIL de ce que l'effet a concrètement fait est journalisé par l'effet lui-même,
+        // juste après : on lit donc toujours « Utilise X » puis « X : ce qui s'est passé ».
+        gm?.JournalPlayerAction($"Utilise {GameManager.ArtifactTag(a)}");
 
         // Déclenche l’effet, consomme à la fin
         effect.BeginUse(gm, onConsumed: () =>

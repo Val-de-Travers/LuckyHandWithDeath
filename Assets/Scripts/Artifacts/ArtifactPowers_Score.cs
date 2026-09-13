@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class FuneralLedgerEffect : IArtifactEffect
 {
-    public int threshold = 70;  // Seuil de 70 pts
+    public int threshold = 50;  // Seuil de 50 pts
     public float bonusPct = 0.50f;  // +50%
     public int penaltyFlat = -20;
 

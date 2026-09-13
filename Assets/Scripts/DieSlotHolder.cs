@@ -52,7 +52,7 @@ public class DieSlotHolder : MonoBehaviour
     public void Release()
     {
         transform.SetParent(null, false);
-        Destroy(gameObject);
+        SafeDestroy.Now(gameObject);
     }
 
     // Rang d'un enfant dans un conteneur de dés : le dé lui-même, ou le fantôme qui le remplace.

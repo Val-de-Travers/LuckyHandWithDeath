@@ -693,9 +693,9 @@ public class Dice3DRenderer : MonoBehaviour
         {
             if (rig.die) { rig.die.suppressScalePulse = false; rig.die.rollAnimationEndTime = 0f; }
             if (rig.originalFace) rig.originalFace.enabled = true;
-            if (rig.raw) Destroy(rig.raw.gameObject);
+            if (rig.raw) SafeDestroy.Now(rig.raw);
             if (rig.cam) rig.cam.targetTexture = null;
-            if (rig.stage) Destroy(rig.stage.gameObject); // emporte cube, vignettes et caméra
+            if (rig.stage) SafeDestroy.Now(rig.stage); // emporte cube, vignettes et caméra
             if (rig.rt) { rig.rt.Release(); Destroy(rig.rt); }
             if (rig.bodyMat) Destroy(rig.bodyMat);
             foreach (var m in rig.faceMats) if (m) Destroy(m);

@@ -16,6 +16,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 17a8411b00a5efc409978d61a974642b, type: 3}
   - {fileID: 8300000, guid: 6a218b11720f9644a85cc1116f1ffa2b, type: 3}
   - {fileID: 8300000, guid: ce230e258dd84fd428116b29def900e3, type: 3}
+  - {fileID: 8300000, guid: 1da43b9685fe62f4ba5590830b4439be, type: 3}
   shuffle: 1
   gapBetweenTracks: 5
   fadeOutOnLeave: 1.5
