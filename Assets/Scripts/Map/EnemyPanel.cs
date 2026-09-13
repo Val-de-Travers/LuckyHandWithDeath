@@ -62,9 +62,23 @@ public class EnemyPanel : MonoBehaviour
         Follow(screenPos);
     }
 
+    // Le Canvas est résolu à la demande : mis en cache une seule fois dans Awake, il restait
+    // nul si le panneau était instancié avant d'être reparenté — le panneau s'activait alors
+    // sans jamais se positionner, donc invisible hors écran. On le retrouve ici au besoin.
+    Canvas ResolveCanvas()
+    {
+        if (rootCanvas) return rootCanvas;
+        rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        if (rootCanvas)
+            uiCam = (rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                  ? null
+                  : (rootCanvas.worldCamera ? rootCanvas.worldCamera : Camera.main);
+        return rootCanvas;
+    }
+
     public void Follow(Vector2 screenPos)
     {
-        if (!rootCanvas || !root) return;
+        if (!ResolveCanvas() || !root) return;
 
         var canvasRT = (RectTransform)rootCanvas.transform;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, screenPos, uiCam, out var local);

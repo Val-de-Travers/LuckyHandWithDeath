@@ -40,6 +40,67 @@ public class SurpriseDieEffect : IArtifactEffect
 }
 
 
+// Mystérieux colis : ajoute un artefact aléatoire dans l'inventaire du joueur.
+public class MysteryParcelEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.IsPlayersTurn) { reason = "Utilisable uniquement durant votre tour."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        // On se retire d'abord (libère une place), PUIS on ajoute l'artefact tiré au sort.
+        onConsumed?.Invoke();
+        gm.Artifact_AddRandomToInventory();
+    }
+}
+
+// Cadeau royal (légendaire) : ajoute un artefact epic ou légendaire dans l'inventaire du joueur.
+public class RoyalGiftEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.IsPlayersTurn) { reason = "Utilisable uniquement durant votre tour."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        onConsumed?.Invoke(); // on se retire d'abord (libère une place)
+        gm.Artifact_AddRandomEpicOrLegendaryToInventory();
+    }
+}
+
+// Sacrifice humain : sacrifie un artefact aléatoire de l'inventaire pour créer un flash de 10.
+public class HumanSacrificeEffect : IArtifactEffect
+{
+    public bool IsUsableNow(GameManager gm, out string reason)
+    {
+        reason = null;
+        if (gm == null) { reason = "Contexte manquant."; return false; }
+        if (!gm.CanCreateTenFlashNow())
+        { reason = "Sacrifice humain : impossible de créer un flash maintenant (il faut 3 dés libres)."; return false; }
+        // Il faut CE colis + au moins un AUTRE artefact à sacrifier.
+        if (gm.playerInventory == null || gm.playerInventory.Count < 2)
+        { reason = "Sacrifice humain : il faut un autre artefact à sacrifier."; return false; }
+        return true;
+    }
+
+    public void BeginUse(GameManager gm, Action onConsumed)
+    {
+        // On se retire d'abord : tout ce qui reste dans l'inventaire est « un autre » artefact.
+        onConsumed?.Invoke();
+        gm.Artifact_SacrificeRandomArtifact(); // retire une victime au hasard
+        gm.Artifact_CreateTenFlash();          // puis matérialise le FLASH de 10
+    }
+}
+
 public class BottleSunEffect : IArtifactEffect
 {
     public bool IsUsableNow(GameManager gm, out string reason)

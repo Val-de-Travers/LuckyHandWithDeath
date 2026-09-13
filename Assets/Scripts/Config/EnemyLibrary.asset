@@ -36,7 +36,7 @@ MonoBehaviour:
     description: "D\xE9capit\xE9 par son personnel, il vous regarde avec d\xE9dains
       malgr\xE9 le fait qu'il n'ait plus de t\xEAte."
     afflictionName: "Bien n\xE9"
-    afflictionDescription: "Il gagne 35 points d\u2019office sur ses 3 premiers jets."
+    afflictionDescription: "Il gagne 35 points d\u2019office \xE0 son premier tour."
     afflictionKey: wellborn
     afflictionIcon: {fileID: -243292356992684390, guid: 19f70588b976a414aa71568f46d3e0e5, type: 3}
   - name: La Magicienne

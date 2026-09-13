@@ -49,6 +49,11 @@ crashlytics-build.properties
 # Réglages locaux à la machine
 .claude/settings.local.json
 
+# Musiques d'ambiance : WAV non compressés trop lourds pour le dépôt (~50 Mo chacun).
+# On garde les .meta (GUID + réglages d'import) pour que les références se reconnectent
+# quand les .wav sont recopiés localement, mais les .wav eux-mêmes restent hors de git.
+Assets/Audio/Music/*.wav
+
 # Fichiers système
 .DS_Store
 Thumbs.db

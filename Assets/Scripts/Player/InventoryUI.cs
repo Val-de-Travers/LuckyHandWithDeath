@@ -91,10 +91,14 @@ public class InventoryUI : MonoBehaviour
         gameManager?.OnInventoryOpenChanged(IsOpen); // met à jour le bouton Destroy
     }
 
-    // L'inventaire ouvert doit rendre AU-DESSUS de tout (y compris un voile de tutoriel).
-    // On lui donne son propre Canvas à tri élevé (créé une seule fois).
+    // En TUTORIEL uniquement : l'inventaire ouvert doit rendre au-dessus du voile (5000+).
+    // On lui donne alors son propre Canvas à tri élevé (créé une seule fois).
+    // En scène principale, on n'applique PAS ce tri géant : il faisait remonter l'inventaire
+    // par-dessus des panneaux qui doivent rester au-dessus de lui. Le simple SetAsLastSibling
+    // de Show() suffit (comportement d'origine).
     void EnsureOnTop()
     {
+        if (!TutorialScene.IsActive) return;
         var c = panel.GetComponent<Canvas>();
         if (!c) c = panel.gameObject.AddComponent<Canvas>();
         c.overrideSorting = true;
